@@ -1,48 +1,35 @@
 package almanac.model
 
-case class Metric private (
-  bucket: String,
-  facts: Map[String, String],
-  timestamp: Long,
-  span: TimeSpan,
-  count: Int,
-  total: Long,
-  max: Long,
-  min: Long,
-  stdev: Double
-){
-  override def clone = Metric(bucket, facts, timestamp, span, count, total, max, min, stdev)
+case class Metric(bucket: String, facts: Metric.FactMap, span: TimeSpan, timestamp: Long,
+                  count: Int, total: Long, max: Long, min: Long) {
+  lazy val key = Metric.Key(bucket, facts, timestamp, span)
+  lazy val value = Metric.Value(count, total, max, min)
 }
 
 object Metric {
-  case class Builder private[model] (
-    bucket: String,
-    facts: Map[String, String],
-    timestamp: Long,
-    span: TimeSpan,
-    count: Int,
-    total: Long,
-    max: Long,
-    min: Long,
-    stdev: Double) {
-
-    def fact(key: String, value: String): Builder = fact(Map(key -> value))
-    def fact(newFacts: (String, String)*): Builder = fact(Map(newFacts:_*))
-    def fact(newFacts: Map[String, String]) = Builder(bucket, facts ++ newFacts, timestamp, span, count, total, max, min, stdev)
-    def timestamp(v: Long): Builder = Builder(bucket, facts, v, span, count, total, max, min, stdev)
-    def span(v: TimeSpan)      = Builder(bucket, facts, timestamp, v, count, total, max, min, stdev)
-    def count(count: Int): Builder          = Builder(bucket, facts, timestamp, span, count, total, max, min, stdev)
-    def total(total: Long): Builder         = Builder(bucket, facts, timestamp, span, count, total, max, min, stdev)
-    def max(max: Long): Builder             = Builder(bucket, facts, timestamp, span, count, total, max, min, stdev)
-    def min(min: Long): Builder             = Builder(bucket, facts, timestamp, span, count, total, max, min, stdev)
-    def stdev(stdev: Double): Builder       = Builder(bucket, facts, timestamp, span, count, total, max, min, stdev)
-
-    def metric: Metric =
-      if (count == 1) Metric(bucket, facts, timestamp, span, count, total, total, total, stdev)
-      else            Metric(bucket, facts, timestamp, span, count, total, max,   min,   stdev)
+  type FactMap = Map[String, String]
+  case class Key(bucket: String, facts: FactMap, timestamp: Long, span: TimeSpan)
+  case class Value(count: Int, total: Long, max: Long, min: Long) {
+    def + (that: Value) = Value(count + that.count, total + that.total, Math.max(max, that.max), Math.min(min, that.min))
   }
 
-  def bucket(bucket: String) = Builder(bucket, Map(), System.currentTimeMillis(), TimeSpan.RAW, 1, 0, 0, 0, .0)
+  private[model] case class RawBuilder(facts: FactMap) {
+    def withFacts(newFacts: (String, String)*) = RawBuilder(facts ++ newFacts)
+    def withFacts(newFacts: FactMap) = RawBuilder(facts ++ newFacts)
+
+    def increment(bucket: String) = count(bucket, 1)
+    def decrement(bucket: String) = count(bucket, -1)
+    def count(bucket: String, amount: Int = 1) = gauge(bucket, amount)
+    def gauge(bucket: String, amount: Int) =
+      Metric(bucket, facts, TimeSpan.RAW, System.currentTimeMillis(), 1, amount, amount, amount)
+  }
+
+  def apply(key: Metric.Key, value: Metric.Value): Metric =
+    Metric(key.bucket, key.facts, key.span, key.timestamp, value.count, value.total, value.max, value.min)
+
+  def metric = RawBuilder(Map())
+  def withFacts(facts: (String, String)*) = RawBuilder(Map(facts:_*))
+  def withFacts(facts: FactMap) = RawBuilder(facts)
 }
 
 sealed abstract class TimeSpan (val millisec: Long) extends Ordered[TimeSpan] {
@@ -71,6 +58,6 @@ object TimeSpan {
   case object UNIX      extends TimeSpan(Long.MaxValue)
 
   lazy val values = Seq(ALL_TIME, RAW, SECOND, MINUTE, HOUR, DAY, MONTH, YEAR, DECADE, CENTURY, MILLENIUM, EPOCH, UNIX)
-  private lazy val lookup = Map( values map { s => (s.millisec, s)}: _*)
+  private lazy val lookup = Map(values map {s => (s.millisec, s)}: _*)
   def toTimeSpan(timestamp: Long) = lookup(timestamp)
 }

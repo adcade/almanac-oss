@@ -11,19 +11,19 @@ libraryDependencies ++= {
   val akkaVersion      = "2.3.9"
   val logbackVersion   = "1.0.13"
   val sprayVersion     = "1.3.2"
+  val sparkVersion     = "1.3.0"
 
   Seq(
     "com.typesafe"      %  "config"                   % configVersion,
     "com.typesafe.akka" %% "akka-actor"               % akkaVersion exclude ("org.scala-lang" , "scala-library"),
     "com.typesafe.akka" %% "akka-slf4j"               % akkaVersion exclude ("org.slf4j", "slf4j-api") exclude ("org.scala-lang" , "scala-library"),
-    "io.spray"          %% "spray-can"                % sprayVersion,
-    "io.spray"          %% "spray-json"               % sprayVersion,
-    "io.spray"          %% "spray-routing"            % sprayVersion,
     "ch.qos.logback"    %  "logback-classic"          % logbackVersion,
+    "org.apache.spark"  %% "spark-core"               % sparkVersion,
+
     "io.spray"          %% "spray-testkit"            % sprayVersion % Test,
     "com.typesafe.akka" %% "akka-testkit"             % akkaVersion  % Test,
     "org.specs2"        %% "specs2-core"              % "2.4.15"     % Test,
-    "org.scalamock"     %% "scalamock-specs2-support" % "3.2.1"      % Test exclude("org.specs2", "specs2"),
+    "org.scalamock"     %% "scalamock-specs2-support" % "3.2.1"      % Test exclude("org.specs2", "specs2")
   )
 }
 

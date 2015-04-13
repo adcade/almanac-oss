@@ -23,21 +23,21 @@ case class Order private[model] (fact: String, dir: Order.Direction) {
 
 case class MetricsQuery (
   buckets: Set[String],
-  predicate: Criteria,
+  criteria: Criteria,
   groupNames: Seq[String],
   orders: Seq[Order],
   timeFilter: TimeFilter) {
 
-  def unwoundQueries = buckets map (b => MetricsQuery(Set(b), predicate, groupNames, orders, timeFilter))
+  def unwoundQueries = buckets map (b => MetricsQuery(Set(b), criteria, groupNames, orders, timeFilter))
 
   override def toString: String = {
     val sb: StringBuilder = new StringBuilder
     sb.append("SELECT ")
     sb.append(buckets)
     sb.append('\n')
-    if (predicate != NonCriteria) {
+    if (criteria != NonCriteria) {
       sb.append("WHERE ")
-      sb.append(predicate)
+      sb.append(criteria)
       sb.append('\n')
     }
     if (groupNames.size > 0) {
@@ -62,23 +62,23 @@ object MetricsQuery {
 
   case class Builder private[model] (
     buckets: Set[String],
-    predicate: Criteria,
+    criteria: Criteria,
     groupNames: Seq[String],
     orders: Seq[Order],
     timeFilter: TimeFilter,
     limit: Int,
     skip: Int) {
 
-    def where(predicate: Criteria) = Builder(buckets, predicate, groupNames, orders, timeFilter, limit, skip)
-    def groupBy(facts: String*) = Builder(buckets, predicate, groupNames ++ facts, orders, timeFilter, limit, skip)
-    def orderBy(orders: Order*) = Builder(buckets, predicate, groupNames, this.orders ++ orders, timeFilter, limit, skip)
+    def where(criteria: Criteria) = Builder(buckets, criteria, groupNames, orders, timeFilter, limit, skip)
+    def groupBy(facts: String*) = Builder(buckets, criteria, groupNames ++ facts, orders, timeFilter, limit, skip)
+    def orderBy(orders: Order*) = Builder(buckets, criteria, groupNames, this.orders ++ orders, timeFilter, limit, skip)
     def orderBy(fact: String, dir: Order.Direction): Builder = orderBy(Order(fact, dir))
-    def time(timeFilter: TimeFilter) = Builder(buckets, predicate, groupNames, orders, timeFilter, limit, skip)
+    def time(timeFilter: TimeFilter) = Builder(buckets, criteria, groupNames, orders, timeFilter, limit, skip)
     def time(span: TimeSpan, fromTime: Long, toTime: Long): Builder = time(TimeFilter(span, fromTime, toTime))
-    def limit(limit: Int): Builder = Builder(buckets, predicate, groupNames, orders, timeFilter, limit, skip)
-    def skip(skip: Int) = Builder(buckets, predicate, groupNames, orders, timeFilter, limit, skip)
+    def limit(limit: Int): Builder = Builder(buckets, criteria, groupNames, orders, timeFilter, limit, skip)
+    def skip(skip: Int) = Builder(buckets, criteria, groupNames, orders, timeFilter, limit, skip)
 
-    lazy val query = MetricsQuery(buckets, predicate, groupNames, orders, timeFilter)
+    lazy val query = MetricsQuery(buckets, criteria, groupNames, orders, timeFilter)
   }
 
   def select(buckets: String*) = Builder(Set(buckets: _*), NonCriteria, Seq(), Seq(), TimeFilter.ALL_TIME, NO_LIMIT, 0)
