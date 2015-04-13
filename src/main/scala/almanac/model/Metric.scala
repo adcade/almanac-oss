@@ -2,13 +2,15 @@ package almanac.model
 
 case class Metric(bucket: String, facts: Metric.FactMap, span: TimeSpan, timestamp: Long,
                   count: Int, total: Long, max: Long, min: Long) {
-  lazy val key = Metric.Key(bucket, facts, timestamp, span)
+  lazy val key = Metric.Key(bucket, facts, span, timestamp)
   lazy val value = Metric.Value(count, total, max, min)
 }
 
 object Metric {
   type FactMap = Map[String, String]
-  case class Key(bucket: String, facts: FactMap, timestamp: Long, span: TimeSpan)
+  case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long) {
+    def | (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan.strip(timestamp))
+  }
   case class Value(count: Int, total: Long, max: Long, min: Long) {
     def + (that: Value) = Value(count + that.count, total + that.total, Math.max(max, that.max), Math.min(min, that.min))
   }
@@ -32,7 +34,7 @@ object Metric {
   def withFacts(facts: FactMap) = RawBuilder(facts)
 }
 
-sealed abstract class TimeSpan (val millisec: Long) extends Ordered[TimeSpan] {
+sealed abstract class TimeSpan (val millisec: Long) extends Ordered[TimeSpan] with Serializable {
   def compare(that: TimeSpan) = (this.millisec - that.millisec) match {
     case x if x > 0 => 1
     case x if x < 0 => -1

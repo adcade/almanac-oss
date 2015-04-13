@@ -27,7 +27,7 @@ object TestModels extends App {
   val m = builderWithFacts increment "some.counter"
   val m1 = metric count ("some.counter", 10)
 
-  val m2 = Metric(m.key, m.value + m1.value)
+  val m2 = Metric(m.key | TimeSpan.MONTH, m.value + m1.value)
 
   println(Seq(m, m1, m2))
 }
