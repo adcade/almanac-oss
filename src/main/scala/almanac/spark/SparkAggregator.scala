@@ -1,33 +1,29 @@
 package almanac.spark
 
-import almanac.model.Metric
 import almanac.model.Metric._
 import almanac.model.TimeSpan._
+import almanac.model.{Metric, TimeSpan}
+import almanac.util.MetricsGenerator
+import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
-import scala.util.Random
-
-class SparkAggregator {
-
-}
-
 object SparkAggregator {
+  implicit class MetricsRDD(val rdd: RDD[Metric]) {
+    def aggregateByTimeSpan(span: TimeSpan) = aggregate(_ | span)
+    def aggregateByFacts(facts: String*) = aggregate(_ & facts)
+//    def aggregateByBucket(regex: String) = aggregate(_.bucket.matches(regex))
+
+    def aggregate(f: Key => Key) =
+      rdd map (m => f(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
+  }
+
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("almanac").setMaster("local")
     val sc = new SparkContext(conf)
 
-    val facts = Seq(withFacts("f1" -> "a", "f2" -> "1"),
-                    withFacts("f1" -> "b", "f2" -> "2"),
-                    withFacts("f3" -> "c", "f2" -> "3"))
-    val ranGen = new Random
-    val metrics = 1 to 1000 map (n => facts(ranGen nextInt facts.size) increment "some.counter")
+    val metrics = MetricsGenerator.generateRaw(5000000)
+    val result = (sc.parallelize(metrics) aggregateByTimeSpan DAY aggregateByFacts "device") collect()
 
-    val result = sc.parallelize(metrics)
-      .map(m => (m.key | MONTH) -> m.value)
-      .reduceByKey(_ + _)
-      .map(t => Metric(t._1, t._2))
-      .collect()
-
-    result.foreach(println)
+    result foreach println
   }
 }

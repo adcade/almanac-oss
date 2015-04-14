@@ -31,28 +31,15 @@ case class MetricsQuery (
   def unwoundQueries = buckets map (b => MetricsQuery(Set(b), criteria, groupNames, orders, timeFilter))
 
   override def toString: String = {
-    val sb: StringBuilder = new StringBuilder
-    sb.append("SELECT ")
-    sb.append(buckets)
-    sb.append('\n')
-    if (criteria != NonCriteria) {
-      sb.append("WHERE ")
-      sb.append(criteria)
-      sb.append('\n')
-    }
-    if (groupNames.size > 0) {
-      sb.append("GROUP BY ")
-      sb.append(groupNames)
-      sb.append('\n')
-    }
-    if (orders.size > 0) {
-      sb.append("ORDER BY ")
-      sb.append(orders)
-      sb.append('\n')
-    }
-    sb.append("TIME ")
-    sb.append(timeFilter)
-    sb.append('\n')
+    val sb = new StringBuilder
+    sb append "SELECT " append buckets append '\n'
+    if (criteria != NonCriteria)
+      sb append "WHERE " append criteria append '\n'
+    if (groupNames.size > 0)
+      sb append "GROUP BY " append groupNames append '\n'
+    if (orders.size > 0)
+      sb append "ORDER BY " append orders append '\n'
+    sb append "TIME " append timeFilter append '\n'
     sb.toString
   }
 }
