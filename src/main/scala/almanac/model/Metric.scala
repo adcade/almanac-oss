@@ -5,6 +5,7 @@ import java.util.Date
 import almanac.model.GeoPrecision._
 import almanac.model.Metric._
 import almanac.model.TimeSpan._
+import sun.security.ec.ECDSASignature.Raw
 
 case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
                   precision: GeoPrecision, geolocation: Option[Coordinate],
@@ -19,8 +20,8 @@ object Metric {
   type FactMap = Map[String, String]
   case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
                  precision: GeoPrecision, geolocation: Option[Coordinate]) {
-    def ~ (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan.strip(timestamp), precision, geolocation)
-    def ~ (toPrecision: GeoPrecision) = Key(bucket, facts, span, timestamp, toPrecision, toPrecision.strip(geolocation))
+    def ~ (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan(timestamp), precision, geolocation)
+    def ~ (toPrecision: GeoPrecision) = Key(bucket, facts, span, timestamp, toPrecision, toPrecision(geolocation))
     def - (factKey: String) = Key(bucket, facts - factKey, span, timestamp, precision, geolocation)
     def & (groups: Seq[String]) = Key(bucket,
         //work around below as filterKeys returns a MapLike view instead of a serializable map
@@ -30,16 +31,17 @@ object Metric {
     def + (that: Value) = Value(count + that.count, total + that.total, Math.max(max, that.max), Math.min(min, that.min))
   }
 
-  case class RawBuilder private[model](facts: FactMap, geolocation: Option[Coordinate]=None) {
-    def withFacts(newFacts: (String, String)*) = RawBuilder(facts ++ newFacts)
-    def withFacts(newFacts: FactMap) = RawBuilder(facts ++ newFacts)
-    def locate(coordinate: Coordinate) = RawBuilder(facts, Some(coordinate))
+  case class RawBuilder private[model](facts: FactMap, location: Option[Coordinate]=None, optTime: Option[Long]=None) {
+    def withFacts(newFacts: (String, String)*) = RawBuilder(facts ++ newFacts, location, optTime)
+    def withFacts(newFacts: FactMap) = RawBuilder(facts ++ newFacts, location, optTime)
+    def locate(coordinate: Coordinate) = RawBuilder(facts, Some(coordinate), optTime)
+    def at(timestamp: Long) = RawBuilder(facts, location, Some(timestamp))
 
     def increment(bucket: String) = count(bucket, 1)
     def decrement(bucket: String) = count(bucket, -1)
     def count(bucket: String, amount: Int = 1) = gauge(bucket, amount)
     def gauge(bucket: String, amount: Int) =
-      Metric(bucket, facts, RAW, System.currentTimeMillis(), Unrounded, geolocation, 1, amount, amount, amount)
+      Metric(bucket, facts, RAW, optTime getOrElse System.currentTimeMillis, Unrounded, location, 1, amount, amount, amount)
   }
 
   def apply(key: Key, value: Value): Metric =
@@ -68,8 +70,10 @@ case class GeoRect(first: Coordinate, second: Coordinate) {
 }
 
 sealed abstract class GeoPrecision(private val digit: Int) extends Serializable {
-  def strip(optionalPos: Option[Coordinate]) = optionalPos match {
-    case Some(pos) => if (digit == 0) None else if (digit == -1) Some(Coordinate(pos.lat, pos.lng)) else Some(Coordinate(round(pos.lat), round(pos.lng)))
+  def apply(optionalPos: Option[Coordinate]) = optionalPos match {
+    case Some(pos) => if (digit == -1) Some(Coordinate(pos.lat, pos.lng))
+                      else if (digit == 0) None
+                      else Some(Coordinate(round(pos.lat), round(pos.lng)))
     case None => None
   }
 
@@ -77,7 +81,7 @@ sealed abstract class GeoPrecision(private val digit: Int) extends Serializable 
 }
 
 object GeoPrecision {
-  case object Unrounded   extends GeoPrecision(-1)
+  case object Unrounded  extends GeoPrecision(-1)
   case object Thousandth extends GeoPrecision(1000)
   case object Hundredth  extends GeoPrecision(100)
   case object Tenth      extends GeoPrecision(10)
@@ -99,7 +103,7 @@ sealed abstract class TimeSpan(val millisec: Long, val dateFormatPattern: String
   }
 
   lazy val dateFormat = new SimpleDateFormat(dateFormatPattern)
-  def strip(timestamp: Long) = if (millisec == 0) 0L else timestamp - timestamp % millisec
+  def apply(timestamp: Long) = if (millisec == 0) 0L else timestamp - timestamp % millisec
 }
 
 object TimeSpan {

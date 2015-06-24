@@ -1,8 +1,8 @@
 import sbt._
 import Keys._
 
-organization := "com.adcade"
-name := "almanac-spark"
+organization := "almanac"
+name := "almanac"
 version := "0.0.1-SNAPSHOT"
 scalaVersion := "2.11.5"
 
@@ -14,16 +14,17 @@ libraryDependencies ++= {
   val sparkVersion     = "1.3.0"
 
   Seq(
-    "com.typesafe"      %  "config"                   % configVersion,
-    "com.typesafe.akka" %% "akka-actor"               % akkaVersion exclude ("org.scala-lang" , "scala-library"),
-    "com.typesafe.akka" %% "akka-slf4j"               % akkaVersion exclude ("org.slf4j", "slf4j-api") exclude ("org.scala-lang" , "scala-library"),
-    "ch.qos.logback"    %  "logback-classic"          % logbackVersion,
-    "org.apache.spark"  %% "spark-core"               % sparkVersion,
+    "com.typesafe"       %  "config"                    % configVersion,
+    "com.typesafe.akka"  %% "akka-actor"                % akkaVersion exclude ("org.scala-lang" , "scala-library"),
+    "com.typesafe.akka"  %% "akka-slf4j"                % akkaVersion exclude ("org.slf4j", "slf4j-api") exclude ("org.scala-lang" , "scala-library"),
+    "ch.qos.logback"     %  "logback-classic"           % logbackVersion,
+    "org.apache.spark"   %% "spark-core"                % sparkVersion,
+//    "com.datastax.spark" %% "spark-cassandra-connector" % sparkVersion,
 
-    "io.spray"          %% "spray-testkit"            % sprayVersion % Test,
-    "com.typesafe.akka" %% "akka-testkit"             % akkaVersion  % Test,
-    "org.specs2"        %% "specs2-core"              % "2.4.15"     % Test,
-    "org.scalamock"     %% "scalamock-specs2-support" % "3.2.1"      % Test exclude("org.specs2", "specs2")
+    "io.spray"           %% "spray-testkit"             % sprayVersion % Test,
+    "com.typesafe.akka"  %% "akka-testkit"              % akkaVersion  % Test,
+    "org.specs2"         %% "specs2-core"               % "2.4.15"     % Test,
+    "org.scalamock"      %% "scalamock-specs2-support"  % "3.2.1"      % Test exclude("org.specs2", "specs2")
   )
 }
 
@@ -41,19 +42,4 @@ crossPaths := false
 
 parallelExecution in Test := false
 
-assemblyJarName in assembly := "almanac-spark.jar"
-
-assemblyMergeStrategy in assembly := {
-  case x if x.contains("default.properties") => MergeStrategy.concat
-  case x if x.contains("adcade.properties") => MergeStrategy.discard
-  case x if x.contains("pom.properties") => MergeStrategy.discard
-  case x if x.contains("pom.xml") => MergeStrategy.discard
-  case x if x.contains("logback.xml")        => MergeStrategy.discard
-  case x if x.contains("META-INF/javamail") => MergeStrategy.last
-  case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
-  case PathList("META-INF", "mailcap") => MergeStrategy.last
-  case x if x.endsWith("spring.tooling") => MergeStrategy.discard
-  case x =>
-    val oldStrategy = (assemblyMergeStrategy in assembly).value
-    oldStrategy(x)
-}
+assemblyJarName in assembly := "almanac.jar"

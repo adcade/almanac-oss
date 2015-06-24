@@ -12,8 +12,8 @@ object TestModels extends App {
 
   val q = select("std.impression")
     .where( (fact("device") is "iphone")
-    and (fact("adId") in ("10001", "10002"))
-    and (fact("os") like """*ios*""") )
+        and (fact("adId") in ("10001", "10002"))
+        and (fact("os") like """*ios*""") )
     .groupBy("adId", "site")
     .orderBy("adId", Order.ASC)
     .time(DAY, 1420020000000L, 1420106400000L)
