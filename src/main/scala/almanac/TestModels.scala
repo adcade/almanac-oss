@@ -10,7 +10,7 @@ object TestModels extends App {
   import MetricsQuery._
   import TimeSpan._
 
-  val q: MetricsQuery = select("std.impression")
+  val q = select("std.impression")
     .where( (fact("device") is "iphone")
     and (fact("adId") in ("10001", "10002"))
     and (fact("os") like """*ios*""") )
@@ -27,7 +27,7 @@ object TestModels extends App {
   val m = builderWithFacts increment "some.counter"
   val m1 = metric count ("some.counter", 10)
 
-  val m2 = Metric(m.key | TimeSpan.MONTH, m.value + m1.value)
+  val m2 = Metric(m.key ~ TimeSpan.MONTH, m.value + m1.value)
 
   println(Seq(m, m1, m2))
 }

@@ -2,52 +2,96 @@ package almanac.model
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
+import almanac.model.GeoPrecision._
 import almanac.model.Metric._
 import almanac.model.TimeSpan._
 
 case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
+                  precision: GeoPrecision, geolocation: Option[Coordinate],
                   count: Int, total: Long, max: Long, min: Long) {
-  lazy val key = Key(bucket, facts, span, timestamp)
+  lazy val key = Key(bucket, facts, span, timestamp, precision, geolocation)
   lazy val value = Value(count, total, max, min)
   lazy val dateStr = if (span == ALL_TIME) "" else span.dateFormat.format(new Date(timestamp))
-  override def toString: String = f"Metric($bucket,$facts,$span($dateStr),$total/$count@[$min,$max])"
+  override def toString = f"Metric($bucket,$facts,$span($dateStr),$precision($geolocation),$total/$count@[$min,$max])"
 }
 
 object Metric {
   type FactMap = Map[String, String]
-  case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long) {
-    def | (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan.strip(timestamp))
-    def - (factKey: String) = Key(bucket, facts - factKey, span, timestamp)
+  case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
+                 precision: GeoPrecision, geolocation: Option[Coordinate]) {
+    def ~ (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan.strip(timestamp), precision, geolocation)
+    def ~ (toPrecision: GeoPrecision) = Key(bucket, facts, span, timestamp, toPrecision, toPrecision.strip(geolocation))
+    def - (factKey: String) = Key(bucket, facts - factKey, span, timestamp, precision, geolocation)
     def & (groups: Seq[String]) = Key(bucket,
         //work around below as filterKeys returns a MapLike view instead of a serializable map
-        Map() ++ facts.filterKeys(groups.contains(_)), span, timestamp)
+        Map() ++ facts.filterKeys(groups.contains(_)), span, timestamp, precision, geolocation)
   }
   case class Value(count: Int, total: Long, max: Long, min: Long) {
     def + (that: Value) = Value(count + that.count, total + that.total, Math.max(max, that.max), Math.min(min, that.min))
   }
 
-  private[model] case class RawBuilder(facts: FactMap) {
+  case class RawBuilder private[model](facts: FactMap, geolocation: Option[Coordinate]=None) {
     def withFacts(newFacts: (String, String)*) = RawBuilder(facts ++ newFacts)
     def withFacts(newFacts: FactMap) = RawBuilder(facts ++ newFacts)
+    def locate(coordinate: Coordinate) = RawBuilder(facts, Some(coordinate))
 
     def increment(bucket: String) = count(bucket, 1)
     def decrement(bucket: String) = count(bucket, -1)
     def count(bucket: String, amount: Int = 1) = gauge(bucket, amount)
     def gauge(bucket: String, amount: Int) =
-      Metric(bucket, facts, TimeSpan.RAW, System.currentTimeMillis(), 1, amount, amount, amount)
+      Metric(bucket, facts, RAW, System.currentTimeMillis(), Unrounded, geolocation, 1, amount, amount, amount)
   }
 
   def apply(key: Key, value: Value): Metric =
-    Metric(key.bucket, key.facts, key.span, key.timestamp, value.count, value.total, value.max, value.min)
+    Metric(key.bucket, key.facts, key.span, key.timestamp, key.precision, key.geolocation,
+           value.count, value.total, value.max, value.min)
 
   def metric = RawBuilder(Map())
   def withFacts(facts: (String, String)*) = RawBuilder(Map(facts:_*))
   def withFacts(facts: FactMap) = RawBuilder(facts)
 }
 
-sealed abstract class TimeSpan(val millisec: Long,
-                               val dateFormatPattern: String = "yyyy") extends Ordered[TimeSpan] with Serializable {
+case class Coordinate(lat: Double, lng: Double)
+case class GeoRect(first: Coordinate, second: Coordinate) {
+  lazy val minLat = math.min(first.lat, second.lat)
+  lazy val maxLat = math.max(first.lat, second.lat)
+  lazy val minLng = math.min(first.lng, second.lng)
+  lazy val maxLng = math.max(first.lng, second.lng)
+  lazy val topLeft = Coordinate(maxLat, minLng)
+  lazy val bottomRight = Coordinate(minLat, maxLng)
+
+  def normalized = GeoRect(topLeft, bottomRight)
+
+  def encompass(coordinate: Coordinate) =
+    coordinate.lat >= minLat && coordinate.lat <= maxLat &&
+    coordinate.lng >= minLng && coordinate.lng <= maxLat
+}
+
+sealed abstract class GeoPrecision(private val digit: Int) extends Serializable {
+  def strip(optionalPos: Option[Coordinate]) = optionalPos match {
+    case Some(pos) => if (digit == 0) None else if (digit == -1) Some(Coordinate(pos.lat, pos.lng)) else Some(Coordinate(round(pos.lat), round(pos.lng)))
+    case None => None
+  }
+
+  private def round(value: Double) = math.floor(value * digit) / digit
+}
+
+object GeoPrecision {
+  case object Unrounded   extends GeoPrecision(-1)
+  case object Thousandth extends GeoPrecision(1000)
+  case object Hundredth  extends GeoPrecision(100)
+  case object Tenth      extends GeoPrecision(10)
+  case object Degree     extends GeoPrecision(1)
+  case object Wordwide   extends GeoPrecision(0)
+
+  lazy val values = Seq(Unrounded, Thousandth, Hundredth, Tenth, Degree, Wordwide)
+  private lazy val lookup = Map(values map {s => (s.digit, s)}: _*)
+  def toPrecision(digit: Int) = lookup(digit)
+}
+
+sealed abstract class TimeSpan(val millisec: Long, val dateFormatPattern: String = "yyyy")
+  extends Ordered[TimeSpan] with Serializable {
+
   def compare(that: TimeSpan) = (this.millisec - that.millisec) match {
     case x if x > 0 => 1
     case x if x < 0 => -1
