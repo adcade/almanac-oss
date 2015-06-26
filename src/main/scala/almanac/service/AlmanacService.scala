@@ -14,6 +14,8 @@ trait AlmanacService {
   def distinctValues(fact: String, bucket: String): Future[Seq[String]]
 
   def record(metric: Metric*): Unit
+}
 
-  def record(metrics: Seq[Metric]): Unit
+trait SparkAlmanacService extends AlmanacService {
+
 }

@@ -13,7 +13,7 @@ case class TimeFilter(span: TimeSpan, fromTime: Long, toTime: Long) {
 }
 
 object GeoFilter {
-  val WORLDWIDE: GeoFilter = new GeoFilter(GeoPrecision.Wordwide, GeoRect(Coordinate(0, 0), Coordinate(0, 0)))
+  val WORLDWIDE: GeoFilter = new GeoFilter(GeoPrecision.Wordwide, GeoRect(0, 0, 0, 0))
 }
 
 case class GeoFilter(precision: GeoPrecision, rect: GeoRect) {

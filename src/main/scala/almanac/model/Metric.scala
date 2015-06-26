@@ -2,95 +2,53 @@ package almanac.model
 
 import java.text.SimpleDateFormat
 import java.util.Date
-import almanac.model.GeoPrecision._
+
 import almanac.model.Metric._
 import almanac.model.TimeSpan._
-import sun.security.ec.ECDSASignature.Raw
 
-case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
-                  precision: GeoPrecision, geolocation: Option[Coordinate],
+case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long, geohash: String,
                   count: Int, total: Long, max: Long, min: Long) {
-  lazy val key = Key(bucket, facts, span, timestamp, precision, geolocation)
+  lazy val key = Key(bucket, facts, span, timestamp, geohash)
   lazy val value = Value(count, total, max, min)
   lazy val dateStr = if (span == ALL_TIME) "" else span.dateFormat.format(new Date(timestamp))
-  override def toString = f"Metric($bucket,$facts,$span($dateStr),$precision($geolocation),$total/$count@[$min,$max])"
+  override def toString = f"Metric($bucket,$facts,$span($dateStr),$geohash,$total/$count@[$min,$max])"
 }
 
 object Metric {
   type FactMap = Map[String, String]
   case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
-                 precision: GeoPrecision, geolocation: Option[Coordinate]) {
-    def ~ (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan(timestamp), precision, geolocation)
-    def ~ (toPrecision: GeoPrecision) = Key(bucket, facts, span, timestamp, toPrecision, toPrecision(geolocation))
-    def - (factKey: String) = Key(bucket, facts - factKey, span, timestamp, precision, geolocation)
+                 geohash: String) {
+    def ~ (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan(timestamp), geohash)
+    def ~ (toPrecision: Int) = Key(bucket, facts, span, timestamp, GeoHash.round(geohash, toPrecision))
+    def - (factKey: String) = Key(bucket, facts - factKey, span, timestamp, geohash)
     def & (groups: Seq[String]) = Key(bucket,
         //work around below as filterKeys returns a MapLike view instead of a serializable map
-        Map() ++ facts.filterKeys(groups.contains(_)), span, timestamp, precision, geolocation)
+        Map() ++ facts.filterKeys(groups.contains(_)), span, timestamp, geohash)
   }
   case class Value(count: Int, total: Long, max: Long, min: Long) {
     def + (that: Value) = Value(count + that.count, total + that.total, Math.max(max, that.max), Math.min(min, that.min))
   }
 
-  case class RawBuilder private[model](facts: FactMap, location: Option[Coordinate]=None, optTime: Option[Long]=None) {
-    def withFacts(newFacts: (String, String)*) = RawBuilder(facts ++ newFacts, location, optTime)
-    def withFacts(newFacts: FactMap) = RawBuilder(facts ++ newFacts, location, optTime)
-    def locate(coordinate: Coordinate) = RawBuilder(facts, Some(coordinate), optTime)
-    def at(timestamp: Long) = RawBuilder(facts, location, Some(timestamp))
+  case class RawBuilder private[model](facts: FactMap, geohash: String = "", optTime: Option[Long]=None) {
+    def withFacts(newFacts: (String, String)*) = RawBuilder(facts ++ newFacts, geohash, optTime)
+    def withFacts(newFacts: FactMap) = RawBuilder(facts ++ newFacts, geohash, optTime)
+    def locate(coordinate: Coordinate) = RawBuilder(facts, coordinate.geohash, optTime)
+    def at(timestamp: Long) = RawBuilder(facts, geohash, Some(timestamp))
 
     def increment(bucket: String) = count(bucket, 1)
     def decrement(bucket: String) = count(bucket, -1)
     def count(bucket: String, amount: Int = 1) = gauge(bucket, amount)
     def gauge(bucket: String, amount: Int) =
-      Metric(bucket, facts, RAW, optTime getOrElse System.currentTimeMillis, Unrounded, location, 1, amount, amount, amount)
+      Metric(bucket, facts, RAW, optTime getOrElse System.currentTimeMillis, geohash, 1, amount, amount, amount)
   }
 
   def apply(key: Key, value: Value): Metric =
-    Metric(key.bucket, key.facts, key.span, key.timestamp, key.precision, key.geolocation,
+    Metric(key.bucket, key.facts, key.span, key.timestamp, key.geohash,
            value.count, value.total, value.max, value.min)
 
   def metric = RawBuilder(Map())
   def withFacts(facts: (String, String)*) = RawBuilder(Map(facts:_*))
   def withFacts(facts: FactMap) = RawBuilder(facts)
-}
-
-case class Coordinate(lat: Double, lng: Double)
-case class GeoRect(first: Coordinate, second: Coordinate) {
-  lazy val minLat = math.min(first.lat, second.lat)
-  lazy val maxLat = math.max(first.lat, second.lat)
-  lazy val minLng = math.min(first.lng, second.lng)
-  lazy val maxLng = math.max(first.lng, second.lng)
-  lazy val topLeft = Coordinate(maxLat, minLng)
-  lazy val bottomRight = Coordinate(minLat, maxLng)
-
-  def normalized = GeoRect(topLeft, bottomRight)
-
-  def encompass(coordinate: Coordinate) =
-    coordinate.lat >= minLat && coordinate.lat <= maxLat &&
-    coordinate.lng >= minLng && coordinate.lng <= maxLat
-}
-
-sealed abstract class GeoPrecision(private val digit: Int) extends Serializable {
-  def apply(optionalPos: Option[Coordinate]) = optionalPos match {
-    case Some(pos) => if (digit == -1) Some(Coordinate(pos.lat, pos.lng))
-                      else if (digit == 0) None
-                      else Some(Coordinate(round(pos.lat), round(pos.lng)))
-    case None => None
-  }
-
-  private def round(value: Double) = math.floor(value * digit) / digit
-}
-
-object GeoPrecision {
-  case object Unrounded  extends GeoPrecision(-1)
-  case object Thousandth extends GeoPrecision(1000)
-  case object Hundredth  extends GeoPrecision(100)
-  case object Tenth      extends GeoPrecision(10)
-  case object Degree     extends GeoPrecision(1)
-  case object Wordwide   extends GeoPrecision(0)
-
-  lazy val values = Seq(Unrounded, Thousandth, Hundredth, Tenth, Degree, Wordwide)
-  private lazy val lookup = Map(values map {s => (s.digit, s)}: _*)
-  def toPrecision(digit: Int) = lookup(digit)
 }
 
 sealed abstract class TimeSpan(val millisec: Long, val dateFormatPattern: String = "yyyy")
