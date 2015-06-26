@@ -15,11 +15,12 @@ case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Lon
 }
 
 object Metric {
+  import Coordinate._
   type FactMap = Map[String, String]
   case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
                  geohash: String) {
     def ~ (toSpan: TimeSpan) = Key(bucket, facts, toSpan, toSpan(timestamp), geohash)
-    def ~ (toPrecision: Int) = Key(bucket, facts, span, timestamp, GeoHash.round(geohash, toPrecision))
+    def ~ (toGeoPrecision: Int) = Key(bucket, facts, span, timestamp, geohash ~ toGeoPrecision)
     def - (factKey: String) = Key(bucket, facts - factKey, span, timestamp, geohash)
     def & (groups: Seq[String]) = Key(bucket,
         //work around below as filterKeys returns a MapLike view instead of a serializable map

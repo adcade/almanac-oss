@@ -1,20 +1,20 @@
-import almanac.model.{Coordinate, GeoHash}
+import almanac.model.Coordinate
 import org.scalatest.{FunSuite, Matchers}
 
-class GeoHashSuite extends FunSuite with Matchers {
-  import GeoHash._
+class GeoSuite extends FunSuite with Matchers {
+  import Coordinate._
 
   test("decoding geohash to coordinate") {
-    val (lat,lng) = decode("dr5ru1pcr6gu")
+    val (lat,lng) = fromGeoHash("dr5ru1pcr6gu")
     lat should be ( 40.743028 +- 0.00001)
     lng should be (-73.992947 +- 0.00001)
   }
 
   test("encoding coordinate to geohash") {
     val geohash = "dr5ru1pcr6gu"
-    val (lat,lng) = decode(geohash)
-    encode(lat,lng) should equal (geohash)
-    encode(lat,lng, 0) should equal ("")
+    val (lat,lng) = fromGeoHash(geohash)
+    toGeoHash(lat, lng) should equal (geohash)
+    toGeoHash(lat, lng, 0) should equal ("")
   }
 
   test("decodeBound should return ?") {

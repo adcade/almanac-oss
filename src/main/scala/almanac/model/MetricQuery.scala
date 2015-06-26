@@ -13,10 +13,10 @@ case class TimeFilter(span: TimeSpan, fromTime: Long, toTime: Long) {
 }
 
 object GeoFilter {
-  val WORLDWIDE: GeoFilter = new GeoFilter(GeoPrecision.Wordwide, GeoRect(0, 0, 0, 0))
+  val WORLDWIDE: GeoFilter = new GeoFilter(0, GeoRect(0, 0, 0, 0))
 }
 
-case class GeoFilter(precision: GeoPrecision, rect: GeoRect) {
+case class GeoFilter(precision: Int, rect: GeoRect) {
   override def toString: String =
     if (this == GeoFilter.WORLDWIDE) "WORLDWIDE"
     else "%s\n  rect %s" format (precision, rect)
@@ -75,7 +75,7 @@ object MetricsQuery {
     def time(filter: TimeFilter) = Builder(buckets, criteria, groupNames, orders, geoFilter, filter, limit, skip)
     def time(span: TimeSpan, fromTime: Long, toTime: Long): Builder = time(TimeFilter(span, fromTime, toTime))
     def locate(filter: GeoFilter): Builder = Builder(buckets, criteria, groupNames, orders, filter, timeFilter, limit, skip)
-    def locate(precision: GeoPrecision, rect: GeoRect): Builder = locate(GeoFilter(precision, rect))
+    def locate(precision: Int, rect: GeoRect): Builder = locate(GeoFilter(precision, rect))
     def limit(limit: Int): Builder = Builder(buckets, criteria, groupNames, orders, geoFilter, timeFilter, limit, skip)
     def skip(skip: Int) = Builder(buckets, criteria, groupNames, orders, geoFilter, timeFilter, limit, skip)
 

@@ -1,47 +1,43 @@
 package almanac.model
 
-object GeoHash {
-  private val base32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+object Coordinate {
+  type Bounds = (Double, Double)
 
-  def decodeBounds(geohash: String): ((Double, Double), (Double, Double)) = {
-    def toBitList: List[Boolean] = geohash.flatMap {
-      c => ("00000" + base32.indexOf(c).toBinaryString ).
-        reverse.take(5).reverse.map('1' == ) } toList
+  val LAT_RANGE = (-90.0, 90.0)
+  val LNG_RANGE = (-180.0, 180.0)
 
-    def split(l: List[Boolean]): (List[Boolean], List[Boolean]) = l match {
-      case Nil => (Nil,Nil)
-      case x::Nil => ( x::Nil,Nil)
-      case x::y::zs => {
-        val (xs,ys) = split( zs )
-        (x::xs,y::ys)
-      }
-    }
-
-    def dehash(xs: List[Boolean], min: Double, max: Double): (Double, Double) = {
-      ((min, max) /: xs ) {
-        case ((min, max), b) =>
-          if (b) ( (min+max)/2, max )
-          else ( min, (min+max)/2 )
-      }
-    }
-
-    val (xs, ys) = split(toBitList)
-    ( dehash(ys, -90, 90), dehash(xs, -180, 180) )
+  implicit class BoundedNum(x: Double) {
+    def in(b: Bounds): Boolean = x >= b._1 && x <= b._2
   }
 
-  def decode(geohash: String): (Double,Double) = {
+  private val BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+  private def charToInt(ch: Char) = BASE32.indexOf(ch)
+  private def intToBits(i: Int) = (4 to 0 by -1) map (i >> _ & 1) map (1==)
+  private def split[T](l: List[T]) = (l :\ (List[T](), List[T]())) { case (b, (list1, list2)) => (b :: list2, list1) }
+  private def dehash(xs: List[Boolean], bounds: Bounds): Bounds = (bounds /: xs ) {
+    case ((min, max), bool) =>
+      if (bool) ( (min+max)/2, max )
+      else ( min, (min+max)/2 )
+  }
+
+  def decodeBounds(geohash: String): (Bounds, Bounds) = {
+    val (xs, ys) = split(geohash map charToInt flatMap intToBits toList)
+    (dehash(ys, LAT_RANGE), dehash(xs, LNG_RANGE))
+  }
+
+  def fromGeoHash(geohash: String): (Double, Double) = {
     decodeBounds(geohash) match {
-      case ((minLat,maxLat),(minLng,maxLng)) => ( (maxLat+minLat)/2, (maxLng+minLng)/2 )
+      case ((minLat, maxLat), (minLng, maxLng)) => ( (maxLat+minLat)/2, (maxLng+minLng)/2 )
     }
   }
 
-  def encode(lat: Double, lng: Double, precision: Int = 12) = {
+  def toGeoHash(lat: Double, lng: Double, precision: Int = 12) = {
     var (minLat,maxLat) = (-90.0,90.0)
     var (minLng,maxLng) = (-180.0,180.0)
     val bits = List(16,8,4,2,1)
 
     (0 until precision).map{ p => {
-      base32 apply (0 until 5).map{ i => {
+      BASE32 apply (0 until 5).map{ i => {
         if (((5 * p) + i) % 2 == 0) {
           val mid = (minLng+maxLng)/2.0
           if (lng > mid) {
@@ -65,30 +61,24 @@ object GeoHash {
     }}.mkString("")
   }
 
-  def round(geohash: String, precision: Int) = geohash.substring(0, precision)
-}
-
-object Coordinate {
-  def apply(geohash: String) = {
-    val (lat, lng) = GeoHash.decode(geohash)
-    new Coordinate(lat, lng)
+  implicit class GeoHashHelper(geohash: String) {
+    def round(precision: Int): String = {
+      require(precision > 0)
+      geohash.substring(0, precision)
+    }
+    def ~(precision: Int) = round(precision)
   }
-  def isValidLat(lat: Double): Boolean = lat <= 90 && lat >= -90
-  def isValidLng(lng: Double): Boolean = lng <= 180 && lng >= -180
 
-  /**
-   * whether the range from west to east across IDL (International Date Line)
-   * @param westLng left bound longitude of the range
-   * @param eastLng right bound longitude of the range
-   * @return a boolean indicates whether this range goes thru international date line
-   */
-  def acrossIDL(westLng: Double, eastLng: Double) = westLng - eastLng > 180
+  def apply(geohash: String): Coordinate = {
+    val (lat, lng) = fromGeoHash(geohash)
+    Coordinate(lat, lng)
+  }
 }
 
 case class Coordinate(lat: Double, lng: Double) {
   import Coordinate._
-  if (!isValidLat(lat)) throw new IllegalArgumentException("latitude out of bound [-90, 90]")
-  if (!isValidLng(lng)) throw new IllegalArgumentException("longitude out of bound [-180, 180]")
+  require(lat in LAT_RANGE, "latitude out of bound [-90, 90]")
+  require(lng in LNG_RANGE, "longitude out of bound [-180, 180]")
 
   def westOf(otherLng: Double): Boolean = if (lng <= otherLng) lng + 180 > otherLng
                                           else if (lng > 0 && otherLng <0) otherLng + 180 < lng
@@ -102,7 +92,7 @@ case class Coordinate(lat: Double, lng: Double) {
   def northOf(otherCo: Coordinate): Boolean = northOf(otherCo.lat)
   def southOf(otherCo: Coordinate): Boolean = southOf(otherCo.lat)
 
-  lazy val geohash = GeoHash.encode(lat, lng)
+  lazy val geohash = toGeoHash(lat, lng)
 }
 
 object GeoRect {
@@ -115,38 +105,15 @@ object GeoRect {
 
 case class GeoRect(north: Double, east: Double, south: Double, west: Double) {
   import Coordinate._
-  if (!isValidLat(north) || !isValidLat(south)) throw new IllegalArgumentException("latitude out of bound [-90, 90]")
-  if (!isValidLng(east) || !isValidLng(west)) throw new IllegalArgumentException("longitude out of bound [-180, 180]")
-  if (north < south) throw new IllegalArgumentException("latitude north < south.")
+  require((north in LAT_RANGE) && (south in LAT_RANGE), "latitude out of bound [-90, 90]")
+  require((east in LNG_RANGE) && (west in LNG_RANGE), "longitude out of bound [-180, 180]")
+  require(north >= south, "latitude north < south.")
 
   def top    = north
   def bottom = south
   def left   = west
   def right  = east
+  lazy val center = Coordinate((north+south)/2, (west+east)/2)
 
   def encompass(co: Coordinate) = (co eastOf west) && (co westOf east) && (co southOf north) && (co northOf south)
-}
-
-sealed abstract class GeoPrecision(private val digit: Int) extends Serializable {
-  def apply(optionalPos: Option[Coordinate]) = optionalPos match {
-    case Some(pos) => if (digit == -1) Some(Coordinate(pos.lat, pos.lng))
-    else if (digit == 0) None
-    else Some(Coordinate(round(pos.lat), round(pos.lng)))
-    case None => None
-  }
-
-  private def round(value: Double) = math.floor(value * digit) / digit
-}
-
-object GeoPrecision {
-  case object Unrounded  extends GeoPrecision(-1)
-  case object Thousandth extends GeoPrecision(1000)
-  case object Hundredth  extends GeoPrecision(100)
-  case object Tenth      extends GeoPrecision(10)
-  case object Degree     extends GeoPrecision(1)
-  case object Wordwide   extends GeoPrecision(0)
-
-  lazy val values = Seq(Unrounded, Thousandth, Hundredth, Tenth, Degree, Wordwide)
-  private lazy val lookup = Map(values map {s => (s.digit, s)}: _*)
-  def toPrecision(digit: Int) = lookup(digit)
 }
