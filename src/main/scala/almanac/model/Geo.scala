@@ -33,7 +33,8 @@ object GeoHash {
   }
 
   private def interleave[T](list1: List[T], list2: List[T]): List[T] = (list1, list2) match {
-    case (x :: Nil, Nil) => x :: Nil
+    case (x, Nil) => x
+    case (Nil, y) => y
     case (x :: xs, y :: ys) => x :: y :: interleave(xs, ys)
     case _ => Nil
   }
