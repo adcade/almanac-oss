@@ -15,7 +15,7 @@ case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Lon
 }
 
 object Metric {
-  import Coordinate._
+  import GeoHash._
   type FactMap = Map[String, String]
   case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
                  geohash: String) {
