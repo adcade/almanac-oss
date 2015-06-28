@@ -23,13 +23,14 @@ libraryDependencies ++= {
     "joda-time"          %  "joda-time"                 % "2.8.1",
     "org.apache.spark"   %% "spark-core"                % sparkVersion,
     "org.apache.spark"   %% "spark-streaming"           % sparkVersion,
-//    "com.datastax.spark" %% "spark-cassandra-connector" % sparkVersion,
+    "com.datastax.spark" %% "spark-cassandra-connector" % "1.4.0-M1",
 
     "io.spray"           %% "spray-testkit"             % sprayVersion % Test,
     "com.typesafe.akka"  %% "akka-testkit"              % akkaVersion  % Test,
     "org.specs2"         %% "specs2-core"               % "2.4.15"     % Test,
     "org.scalatest"      %% "scalatest"                 % "2.2.4"      % Test,
     "org.scalamock"      %% "scalamock-specs2-support"  % "3.2.1"      % Test exclude("org.specs2", "specs2")
+
   )
 }
 

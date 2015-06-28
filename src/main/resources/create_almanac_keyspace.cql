@@ -18,4 +18,4 @@ CREATE TABLE metrics (
 	max int,
 	min int,
 	PRIMARY KEY ((bucket, geohash), span, ts, factkey)
-) WITH CLUSTERING ORDER BY (span DESC, ts DESC, bucket ASC);ƒ
+);
