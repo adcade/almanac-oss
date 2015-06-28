@@ -7,6 +7,7 @@ import almanac.model.Metric._
 import almanac.model.TimeSpan._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone.UTC
+import GeoHash._
 
 case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long, geohash: String,
                   count: Int, total: Long, max: Long, min: Long) {
@@ -17,7 +18,6 @@ case class Metric(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Lon
 }
 
 object Metric {
-  import GeoHash._
   type FactMap = Map[String, String]
   case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
                  geohash: String) {
@@ -54,28 +54,23 @@ object Metric {
   def withFacts(facts: FactMap) = RawBuilder(facts)
 }
 
-sealed abstract class TimeSpan(val strip: (DateTime) => (DateTime), val dateFormatPattern: String = "yyyy")
-  extends Serializable {
-
-//  def compare(that: TimeSpan) = values.indexOf(this) - values.indexOf(that)
-
+sealed abstract class TimeSpan(val strip: Strip, val dateFormatPattern: String = "yyyy") extends Serializable {
   lazy val dateFormat = new SimpleDateFormat(dateFormatPattern)
 
-  private val rawIndex = 2
-
-  private def thisIndex = values.indexOf(this)
+  private val secondIndex = 2
+  lazy val index = values.indexOf(this)
 
   def apply(timestamp: Long): Long = {
-    if (this == ALL_TIME) 0L else {
-      val datetime = new DateTime(timestamp, UTC)
-      (datetime /: (rawIndex to thisIndex)) { (datetime, index) =>
-        values(index).strip(datetime)
-      }.getMillis
-    }
+    if (this == ALL_TIME) 0L
+    else (secondIndex to this.index foldLeft new DateTime(timestamp, UTC)) {
+      (datetime, i) => values(i).strip(datetime)
+    }.getMillis
   }
 }
 
 object TimeSpan {
+  type Strip = (DateTime) => (DateTime)
+
   case object ALL_TIME  extends TimeSpan(_ withMillis 0)
   case object RAW       extends TimeSpan(x => x, "yyyy/MM/dd HH:mm:ss.S")
   case object SECOND    extends TimeSpan(_ withMillisOfSecond 0, "yyyy/MM/dd HH:mm:ss")
