@@ -33,7 +33,7 @@ class CassandraRddDaoSuite extends FunSuite with Matchers{
   }
 
   test("test save") {
-    val metrics = MetricsGenerator.generateRawWithGeo(100)
+    val metrics = MetricsGenerator.generateRawWithGeo(10)
     val rdds = sc.parallelize(metrics)
     val dao = new CassandraRddDao(sc)
     dao.save(rdds)

@@ -12,7 +12,7 @@ import org.apache.spark.streaming.dstream.DStream
 /**
  * Created by binliu on 6/28/15.
  */
-class CassandraRddDao(sc: SparkContext) extends MetricStreamHandler with MetricStreamRetriever{
+class CassandraRddDao(sc: SparkContext) extends MetricStreamHandler with MetricStreamRetriever with Serializable{
 
   private val KEYSPACE = "almanac"
   private val TABLE_NAME = "metrics"
@@ -66,8 +66,8 @@ class CassandraRddDao(sc: SparkContext) extends MetricStreamHandler with MetricS
       )
   }
 
-  def read(bucket: String, geoHash: String, span: TimeSpan) : RDD[Metric] = {
-    val queryAsCql = s" ${COLUMN_NAMES.BUCKET} = ${bucket} and ${COLUMN_NAMES.GEOHASH} = ${geoHash} and ${COLUMN_NAMES.SPAN} = ${span.index} "
+  def read(bucket: String, geoHash: String, span: TimeSpan) : Unit = {
+    val queryAsCql = s" ${COLUMN_NAMES.BUCKET} = '${bucket}' and ${COLUMN_NAMES.GEOHASH} = '${geoHash}' and ${COLUMN_NAMES.SPAN} = ${span.index} "
 
     sc.cassandraTable(KEYSPACE, TABLE_NAME)
       .select(COLUMN_NAMES.BUCKET,
@@ -96,7 +96,7 @@ class CassandraRddDao(sc: SparkContext) extends MetricStreamHandler with MetricS
     }
   }
 
-  def read(query: MetricsQuery): RDD[Metric] = {
+  def read(query: MetricsQuery): List[Metric] = {
     val queryAsCql = s"${COLUMN_NAMES.BUCKET} = ${query.buckets.head} and ${COLUMN_NAMES.GEOHASH} = ${query.geoFilter.rect.geohashes(8).head} and ${COLUMN_NAMES.SPAN} = ${query.timeFilter.span}"
 
     sc.cassandraTable(KEYSPACE, TABLE_NAME)
@@ -111,6 +111,7 @@ class CassandraRddDao(sc: SparkContext) extends MetricStreamHandler with MetricS
         COLUMN_NAMES.TIMESTAMP,
         COLUMN_NAMES.TOTAL)
       .where(queryAsCql)
+      .collect()
       .map { r =>
       new Metric(
         bucket = r.getString(COLUMN_NAMES.BUCKET),
@@ -123,6 +124,6 @@ class CassandraRddDao(sc: SparkContext) extends MetricStreamHandler with MetricS
         max = r.getLong(COLUMN_NAMES.MAX),
         min = r.getLong(COLUMN_NAMES.MIN)
       )
-    }
+    }.toList
   }
 }
