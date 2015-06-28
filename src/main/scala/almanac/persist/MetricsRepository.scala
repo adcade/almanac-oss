@@ -54,8 +54,8 @@ class InMemoMetricsRepositoryActor extends Actor with MetricsRepository{
     Future {
       (for { bucket <- query.buckets
              geohash <- gf.rect.geohashes(gf.precision)
-             timestamp <- tf.fromTime to tf.toTime by tf.span.millisec
-             metric <- store(bucket + geohash + tf.span + timestamp)
+//             timestamp <- tf.fromTime to tf.toTime by tf.span.millisec
+             metric <- store(bucket + geohash + tf.span + tf.fromTime)
       } yield metric).toSeq
     }
   }

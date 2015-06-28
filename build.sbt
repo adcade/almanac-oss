@@ -20,6 +20,7 @@ libraryDependencies ++= {
     "com.typesafe.akka"  %% "akka-actor"                % akkaVersion exclude ("org.scala-lang" , "scala-library"),
     "com.typesafe.akka"  %% "akka-slf4j"                % akkaVersion exclude ("org.slf4j", "slf4j-api") exclude ("org.scala-lang" , "scala-library"),
     "ch.qos.logback"     %  "logback-classic"           % logbackVersion,
+    "joda-time"          %  "joda-time"                 % "2.8.1",
     "org.apache.spark"   %% "spark-core"                % sparkVersion,
     "org.apache.spark"   %% "spark-streaming"           % sparkVersion,
 //    "com.datastax.spark" %% "spark-cassandra-connector" % sparkVersion,
