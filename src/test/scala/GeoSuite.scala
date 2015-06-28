@@ -1,5 +1,6 @@
 import almanac.model.{GeoHash, GeoRect, Coordinate}
 import org.scalatest.{FunSuite, Matchers}
+import Coordinate._
 
 class GeoSuite extends FunSuite with Matchers {
   import GeoHash._
@@ -35,10 +36,10 @@ class GeoSuite extends FunSuite with Matchers {
   }
 
   test("coordinate constructors and validators") {
-    an[IllegalArgumentException] should be thrownBy Coordinate(-91, 0)
-    an[IllegalArgumentException] should be thrownBy Coordinate(91, 0)
-    an[IllegalArgumentException] should be thrownBy Coordinate(0, 181)
-    an[IllegalArgumentException] should be thrownBy Coordinate(0, -181)
+    an[IllegalArgumentException] should be thrownBy (-91.0 x 0.0)
+    an[IllegalArgumentException] should be thrownBy (91.0 x 0.0)
+    an[IllegalArgumentException] should be thrownBy (0.0 x 181.0)
+    an[IllegalArgumentException] should be thrownBy (0.0 x -181.0)
 
     val geohash = "dr5ru1pcr6gu"
     val co = Coordinate("dr5ru1pcr6gu")
@@ -54,22 +55,39 @@ class GeoSuite extends FunSuite with Matchers {
       -45 0 45
     */
 
-    assert((Coordinate(0,  -45) westOf   45) && !(Coordinate(0,  -45) eastOf   45))
-    assert((Coordinate(0,   45) westOf  135) && !(Coordinate(0,   45) eastOf  135))
-    assert((Coordinate(0,  135) westOf -135) && !(Coordinate(0,  135) eastOf -135))
-    assert((Coordinate(0, -135) westOf  -45) && !(Coordinate(0, -135) eastOf  -45))
-
-    assert((Coordinate(0,   45) eastOf  -45) && !(Coordinate(0,   45) westOf  -45))
-    assert((Coordinate(0,  135) eastOf   45) && !(Coordinate(0,  135) westOf   45))
-    assert((Coordinate(0, -135) eastOf  135) && !(Coordinate(0, -135) westOf  135))
-    assert((Coordinate(0,  -45) eastOf -135) && !(Coordinate(0,  -45) westOf -135))
+    assert( ( -45.0 westOf   45.0) && (  45.0 eastOf  -45.0) && !( -45.0 eastOf   45.0) && !(  45.0 westOf  -45.0) )
+    assert( (  45.0 westOf  135.0) && ( 135.0 eastOf   45.0) && !(  45.0 eastOf  135.0) && !( 135.0 westOf   45.0) )
+    assert( ( 135.0 westOf -135.0) && (-135.0 eastOf  135.0) && !( 135.0 eastOf -135.0) && !(-135.0 westOf  135.0) )
+    assert( (-135.0 westOf  -45.0) && ( -45.0 eastOf -135.0) && !(-135.0 eastOf  -45.0) && !( -45.0 westOf -135.0) )
   }
 
-
   test("latitude 45 northOf 15 northOf -15 northOf -45") {
-    assert  (Coordinate( 45, 0) northOf  15)
-    assert  (Coordinate( 15, 0) northOf -15)
-    assert  (Coordinate(-15, 0) northOf -45)
-    assert(!(Coordinate(-45, 0) northOf  45))
+    assert  ( 45.0 northOf  15.0)
+    assert  ( 15.0 northOf -15.0)
+    assert  (-15.0 northOf -45.0)
+    assert(!(-45.0 northOf  45.0))
+  }
+
+  test("rect intersect rect") {
+    assert (GeoRect(10, 10, -10, -10) intersects GeoRect(20, 20, 0, 0))
+    assert (!(GeoRect(10, 10, -10, -10) intersects GeoRect(20, 10, 10, -10)))
+    assert (GeoRect(10, 10, -10, -10) intersects GeoRect(45, 10, -45, -10))
+    assert (GeoRect(10, -170, -10, 170) intersects GeoRect(5, -160, -5, 160))
+    assert (GeoRect(10, -170, -10, 170) intersects GeoRect(5, 180, -5, 160))
+  }
+
+  test("get geohashes of a GeoRect") {
+    val rect1 = GeoRect("dr5ru1pcr6gu")
+    rect1.geohashes(12) should be (Set("dr5ru1pcr6gu"))
+
+    val rect2 = GeoRect("dr5ru")
+    rect2.geohashes(12) should be (Set("dr5ru"))
+
+    val rect3 = GeoRect(10.001, 10.001, 10, 10)
+    rect3.geohashes(8) should be (Set("s1z0gsd1", "s1z0gsd7", "s1z0gsd2", "s1z0gs6p", "s1z0gsd6",
+                                      "s1z0gsd3", "s1z0gsd5", "s1z0gsd4", "s1z0gs6r", "s1z0gsd0"))
+
+    rect3.geohashes(7, inner=true) should be (Set())
+    rect3.geohashes(7, inner=false) should be (Set("s1z0gs3", "s1z0gs6", "s1z0gs9", "s1z0gsd"))
   }
 }

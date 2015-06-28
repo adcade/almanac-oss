@@ -1,11 +1,14 @@
 package almanac.spark
 
+import akka.actor.{Actor, ActorRef}
 import almanac.model.Metric._
 import almanac.model.{Metric, TimeSpan}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.receiver.ActorHelper
 
 import scala.language.postfixOps
+import scala.reflect.ClassTag
 
 trait MetricsAggregator[Source] {
   val source: Source
@@ -84,4 +87,22 @@ object SparkMetricsAggregator {
 
   def apply(stream: DStream[Metric], handler: MetricStreamHandler) = new SparkMetricsAggregator(stream, handler)
 
+}
+
+case class SubscribeReceiver(receiverActor: ActorRef)
+case class UnsubscribeReceiver(receiverActor: ActorRef)
+
+import almanac.service.MetricsProtocol._
+
+class MetricsActorReceiver[T: ClassTag] (urlOfPublisher: String)
+  extends Actor with ActorHelper {
+  lazy private val publisher = context.actorSelection(urlOfPublisher)
+
+  override def preStart(): Unit = publisher ! SubscribeReceiver(context.self)
+
+  def receive = {
+    case Record(metrics) => store(metrics)
+  }
+
+  override def postStop(): Unit = publisher ! UnsubscribeReceiver(context.self)
 }

@@ -10,12 +10,13 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 object Almanac extends App {
   val conf = new SparkConf().setAppName("almanac")
-  val sc = new SparkContext("local[2]", "test", conf)
+    .set("spark.cassandra.connection.host", "127.0.0.1")
+  val sc = new SparkContext("local[3]", "test", conf)
   val ssc = new StreamingContext(sc, Seconds(1))
 
 //  val timeSchedules = List(SECOND, MINUTE, HOUR, DAY, ALL_TIME)
 //  val geoSchedules = List(8, 6, 4, 2, 0)
-val timeSchedules = List(HOUR, ALL_TIME)
+  val timeSchedules = List(HOUR, ALL_TIME)
   val geoSchedules = List(4, 0)
   val metricsStream = ssc receiverStream new MetricsReceiver
   val aggregator = SparkMetricsAggregator(metricsStream, new MetricStreamHandler {

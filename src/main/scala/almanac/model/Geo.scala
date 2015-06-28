@@ -1,5 +1,8 @@
 package almanac.model
 
+import almanac.model.Coordinate._
+import almanac.model.GeoHash._
+
 object GeoHash {
   type Bounds = (Double, Double)
 
@@ -8,8 +11,14 @@ object GeoHash {
 
   val WORLDWIDE = 0
 
-  implicit class BoundedNum(x: Double) {
+  implicit class CoordinateWrapper(x: Double) {
     def in(b: Bounds): Boolean = x >= b._1 && x <= b._2
+    def westOf(otherLng: Double): Boolean = if (x < otherLng) x + 180 > otherLng
+                                            else if (x > 0 && otherLng <0) otherLng + 180 < x
+                                            else false
+    def eastOf(otherLng: Double): Boolean = !westOf(otherLng)
+    def northOf(otherLat: Double): Boolean = otherLat < x
+    def southOf(otherLat: Double): Boolean = !northOf(otherLat)
   }
 
   val BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
@@ -73,50 +82,54 @@ object GeoHash {
 }
 
 object Coordinate {
+  implicit class CoordinateBuilder(latitude: Double) {
+
+    /**
+     * latitude intersect longitude, to build a coordinate
+     * @param longitude the longitude to intersect with
+     * @return a Coordinate of the included latitude and the passed longitude
+     */
+    def x(longitude: Double) = Coordinate(latitude, longitude)
+    def lng(longitude: Double) = x(longitude)
+  }
+
+  def lat(latitude: Double) = new CoordinateBuilder(latitude)
+
   def apply(geohash: String): Coordinate = {
     val (lat, lng) = GeoHash.decode(geohash)
-    Coordinate(lat, lng)
+    lat x lng
   }
 }
 
 case class Coordinate(lat: Double, lng: Double) {
-  import GeoHash._
   require(lat in LAT_RANGE, "latitude out of bound [-90, 90]")
   require(lng in LNG_RANGE, "longitude out of bound [-180, 180]")
-
-  def westOf(otherLng: Double): Boolean = if (lng <= otherLng) lng + 180 > otherLng
-                                          else if (lng > 0 && otherLng <0) otherLng + 180 < lng
-                                          else false
-  def eastOf(otherLng: Double): Boolean = !westOf(otherLng)
-  def northOf(otherLat: Double): Boolean = otherLat <= lat
-  def southOf(otherLat: Double): Boolean = !northOf(otherLat)
-
-  def eastOf(otherCo: Coordinate): Boolean = eastOf(otherCo.lng)
-  def westOf(otherCo: Coordinate): Boolean = westOf(otherCo.lng)
-  def northOf(otherCo: Coordinate): Boolean = northOf(otherCo.lat)
-  def southOf(otherCo: Coordinate): Boolean = southOf(otherCo.lat)
 
   lazy val geohash = encode(lat, lng)
 }
 
 object GeoRect {
-  import GeoHash._
-
   def apply(geohash: String): GeoRect = {
-    toBounds(geohash) match {
-      case ((minLat, maxLat), (minLng, maxLng)) => GeoRect(Coordinate(maxLat, maxLng), Coordinate(minLat, minLng))
-    }
+    val ((minLat, maxLat), (minLng, maxLng)) = toBounds(geohash)
+    GeoRect(maxLat x maxLng, minLat x minLng)
   }
 
   def apply(co1: Coordinate, co2: Coordinate) = new GeoRect(
-    if (co1 northOf co2) co1.lat else co2.lat,
-    if (co1 eastOf  co2) co1.lng else co2.lng,
-    if (co1 southOf co2) co1.lat else co2.lat,
-    if (co1 westOf  co2) co1.lng else co2.lng)
+    if (co1.lat northOf co2.lat) co1.lat else co2.lat,
+    if (co1.lat eastOf  co2.lat) co1.lng else co2.lng,
+    if (co1.lng southOf co2.lng) co1.lat else co2.lat,
+    if (co1.lng westOf  co2.lng) co1.lng else co2.lng)
 }
 
-case class GeoRect(north: Double, east: Double, south: Double, west: Double) {
-  import GeoHash._
+trait Shape {
+  def intersects(other: GeoRect): Boolean
+  def intersects(geohash: String): Boolean
+  def contains(co: Coordinate): Boolean
+  def contains(other: GeoRect): Boolean
+  def contains(geohash: String): Boolean
+}
+
+case class GeoRect(north: Double, east: Double, south: Double, west: Double) extends Shape {
   require((north in LAT_RANGE) && (south in LAT_RANGE), "latitude out of bound [-90, 90]")
   require((east in LNG_RANGE) && (west in LNG_RANGE), "longitude out of bound [-180, 180]")
   require(north >= south, "latitude north < south.")
@@ -125,19 +138,35 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) {
   def bottom = south
   def left   = west
   def right  = east
-  lazy val center = Coordinate((north+south)/2, (west+east)/2)
+  lazy val center = (north+south)/2 x (west+east)/2
 
-  def contains(co: Coordinate): Boolean = (co eastOf west) && (co westOf east) && (co southOf north) && (co northOf south)
-  def contains(geohash: String): Boolean = {
-    val ((minLat, maxLat), (minLng, maxLng)) = toBounds(geohash)
-    contains(Coordinate(minLat, minLng)) && contains(Coordinate(maxLat, maxLng))
+  def intersects(other: GeoRect): Boolean = !(
+    (east westOf other.west) || (east == other.west) ||
+    (west eastOf other.east) || (west == other.east) ||
+    (south northOf other.north) || (south == other.north) ||
+    (north southOf other.south) || (north == other.south) ||
+    contains(other)
+  )
+  def intersects(geohash: String): Boolean = intersects(GeoRect(geohash))
+  def contains(co: Coordinate): Boolean = ((co.lng eastOf west) || (co.lng == west)) &&
+                                          ((co.lng westOf east) || (co.lng == east)) &&
+                                          ((co.lat southOf north) || (co.lat == north)) &&
+                                          ((co.lat northOf south) || (co.lat == south))
+  def contains(other: GeoRect): Boolean = contains(other.south x other.west) && contains(other.north x other.east)
+  def contains(geohash: String): Boolean = contains(GeoRect(geohash))
+
+  def geohashes(precision: Int, inner: Boolean = true): Set[String] = {
+    def _geohashes(prefix: String): Seq[String] = {
+      if (prefix.length >= precision)
+        if (inner) Seq.empty else Seq(prefix)
+      else
+        BASE32 map (prefix + _) flatMap { gh =>
+          if (this contains gh) Seq(gh)
+          else if (this intersects gh) _geohashes(gh)
+          else Seq.empty
+        }
+    }
+    _geohashes("").toSet
   }
-
-  def geohashes(precision: Int): Set[String] = ???
-//  def geohashes(precision: Int): Set[String] = {
-//    def geohashes(geohash: String) = {
-//      BASE32.
-//    }
-//  }
 
 }

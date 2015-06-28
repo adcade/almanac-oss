@@ -1,11 +1,12 @@
 package almanac.util
 
+import almanac.model.Coordinate._
 import almanac.model.GeoHash.Bounds
-import almanac.model.{Coordinate, Metric}
+import almanac.model.Metric
 import almanac.model.Metric._
 import org.apache.spark.Logging
-import org.apache.spark.streaming.receiver.Receiver
 import org.apache.spark.storage.StorageLevel._
+import org.apache.spark.streaming.receiver.Receiver
 
 import scala.util.Random
 
@@ -23,7 +24,7 @@ object MetricsGenerator {
     _=> withFacts("device"->random(devices), "os"->random(os)) increment random(buckets)
   }
   def generateRawWithGeo(times: Int) = 1 to times map {
-    _=> metric locate Coordinate(random(latRange), random(lngRange)) increment random(buckets)
+    _=> metric locate(random(latRange) x random(lngRange)) increment random(buckets)
   }
 }
 

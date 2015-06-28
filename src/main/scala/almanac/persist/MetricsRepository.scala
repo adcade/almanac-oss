@@ -3,6 +3,7 @@ package almanac.persist
 import akka.actor.Actor
 import almanac.model.{Metric, MetricsQuery}
 import almanac.service.MetricsProtocol.Query
+import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
 
 import scala.collection.mutable
@@ -15,7 +16,7 @@ trait MetricsRepository {
 }
 
 trait MetricDStreamPersistor {
-  def save(stream: DStream[Metric]): Future[Unit]
+  def save(stream: RDD[Metric]): Future[Unit]
 }
 
 case class Persist(stream: DStream[Metric])
