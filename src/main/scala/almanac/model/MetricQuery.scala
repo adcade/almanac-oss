@@ -51,6 +51,7 @@ case class MetricsQuery (
     if (orders.size > 0)
       sb append "ORDER BY " append orders append '\n'
     sb append "TIME " append timeFilter append '\n'
+    sb append "GEO " append geoFilter append '\n'
     sb.toString
   }
 }

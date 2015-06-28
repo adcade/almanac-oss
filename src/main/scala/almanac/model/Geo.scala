@@ -6,11 +6,13 @@ object GeoHash {
   val LAT_RANGE = (-90.0, 90.0)
   val LNG_RANGE = (-180.0, 180.0)
 
+  val WORLDWIDE = 0
+
   implicit class BoundedNum(x: Double) {
     def in(b: Bounds): Boolean = x >= b._1 && x <= b._2
   }
 
-  private val BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
+  val BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
 
   def toBounds(geohash: String): (Bounds, Bounds) = {
     def charToInt(ch: Char) = BASE32.indexOf(ch)
@@ -125,8 +127,17 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) {
   def right  = east
   lazy val center = Coordinate((north+south)/2, (west+east)/2)
 
-  def contains(co: Coordinate) = (co eastOf west) && (co westOf east) && (co southOf north) && (co northOf south)
-  def contains(geohash: String) = ???
-  def toGeoHashPrefixes: Set[String] = ???
+  def contains(co: Coordinate): Boolean = (co eastOf west) && (co westOf east) && (co southOf north) && (co northOf south)
+  def contains(geohash: String): Boolean = {
+    val ((minLat, maxLat), (minLng, maxLng)) = toBounds(geohash)
+    contains(Coordinate(minLat, minLng)) && contains(Coordinate(maxLat, maxLng))
+  }
+
+  def geohashes(precision: Int): Set[String] = ???
+//  def geohashes(precision: Int): Set[String] = {
+//    def geohashes(geohash: String) = {
+//      BASE32.
+//    }
+//  }
 
 }

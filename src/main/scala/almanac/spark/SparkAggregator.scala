@@ -1,31 +1,87 @@
 package almanac.spark
 
 import almanac.model.Metric._
-import almanac.model.TimeSpan._
-import almanac.model.{GeoPrecision, Metric, TimeSpan}
-import almanac.util.MetricsGenerator
+import almanac.model.{Metric, TimeSpan}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkConf, SparkContext}
-//import com.datastax.spark.connector._
+import org.apache.spark.streaming.dstream.DStream
+
+import scala.language.postfixOps
+
+trait MetricsAggregator[Source] {
+  val source: Source
+  def aggregateByTimeSpan(span: TimeSpan) = aggregate(_ ~ span)
+  def aggregateByFacts(facts: String*) = aggregate(_ & facts)
+  def aggregateByGeoPrecision(precision: Int) = aggregate(_ ~ precision)
+  // def aggregateByBucket(regex: String) = aggregate(_.bucket.matches(regex))
+
+  def aggregate(func: Key => Key): Source
+}
+
+trait MetricStreamHandler {
+  def handle(span: TimeSpan, precision: Int, stream: DStream[Metric])
+}
+
+class SparkMetricsAggregator(stream: DStream[Metric], handler: MetricStreamHandler) {
+  import SparkMetricsAggregator._
+
+  def geoProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
+    // aggregate geo and handle result stream
+    val resultStream = stream aggregateByGeoPrecision precision
+    handler.handle(span, precision, resultStream)
+    resultStream
+  }
+
+  def timeProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
+    // aggregate time and handle result stream
+    val resultStream = stream aggregateByTimeSpan span
+    handler.handle(span, precision, resultStream)
+    resultStream
+  }
+
+  /**
+   * aggregate the first timeSchedule to the intial stream
+   * then aggregate on each level of timeSchedules and geoSchedules like below:
+   *
+   * Seq(HOUR, DAY, ALL_TIME) Seq(8, 4, WORLDWIDE)
+   *
+   * 12, RAW -> initial stream -> 8, HOUR -> DAY -> ALL_TIME
+   *                                 |
+   *                                 V
+   *                              4, HOUR -> DAY -> ALL_TIME
+   *                                 |
+   *                                 V
+   *                      WORLDWIDE, HOUR -> DAY -> ALL_TIME
+   *
+   * the return value is the last aggregated stream in the above case: WORLDWIDE / ALL_TIME
+   * @param timeSchedules time spans to be aggregated
+   * @param geoSchedules geo precision levels to be aggregated
+   * @return the stream of the last aggregated stream
+   */
+  def schedule(geoSchedules: List[Int], timeSchedules: List[TimeSpan]) = {
+    // aggregate first level of time span
+    val intialTimeSchedule :: otherTimeSchedules = timeSchedules
+    val initialStream = stream aggregateByTimeSpan intialTimeSchedule
+    // aggregate
+    (initialStream /: geoSchedules) ((tranStream, precision) => {
+      (geoProcess(tranStream, precision, intialTimeSchedule) /: otherTimeSchedules)(
+        timeProcess(_, precision, _)
+      )
+      tranStream
+    })
+  }
+}
 
 object SparkMetricsAggregator {
-  implicit class MetricsRDD(val rdd: RDD[Metric]) {
-    def aggregateByTimeSpan(span: TimeSpan) = aggregate(_ ~ span)
-    def aggregateByFacts(facts: String*) = aggregate(_ & facts)
-    def aggregateByGeoPrecision(precision: GeoPrecision) = aggregate(_ ~ precision)
-//    def aggregateByBucket(regex: String) = aggregate(_.bucket.matches(regex))
-
-    def aggregate(func: Key => Key) =
-      rdd map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
+  implicit class RDDMetricsExtension(val source: RDD[Metric]) extends MetricsAggregator[RDD[Metric]]  {
+    override def aggregate(func: Key => Key) =
+      source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
   }
 
-  def main(args: Array[String]) {
-    val conf = new SparkConf().setAppName("almanac")
-    val sc = new SparkContext("local", "test", conf)
-
-    val metrics = MetricsGenerator.generateRaw(5000000)
-    val result = (sc.parallelize(metrics) aggregateByTimeSpan DAY aggregateByFacts "device") collect()
-
-    result foreach println
+  implicit class DStreamMetricsExtension(val source: DStream[Metric]) extends MetricsAggregator[DStream[Metric]] {
+    override def aggregate(func: Key => Key) =
+      source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
   }
+
+  def apply(stream: DStream[Metric], handler: MetricStreamHandler) = new SparkMetricsAggregator(stream, handler)
+
 }
