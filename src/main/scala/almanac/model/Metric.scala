@@ -10,11 +10,11 @@ import org.joda.time.DateTimeZone.UTC
 import GeoHash._
 
 case class Metric(bucket: String, facts: Map[String, String]=Map.empty, span: TimeSpan, timestamp: Long, geohash: String,
-                  count: Int, total: Long, max: Long, min: Long) {
+                  count: Int, total: Long) {
   lazy val key = Key(bucket, facts, span, timestamp, geohash)
-  lazy val value = Value(count, total, max, min)
+  lazy val value = Value(count, total)
   lazy val dateStr = if (span == ALL_TIME) "" else span.dateFormat.format(new Date(timestamp))
-  override def toString = f"Metric($bucket,$facts,$span($dateStr),$geohash,$total/$count@[$min,$max])"
+  override def toString = f"Metric($bucket,$facts,$span($dateStr),$geohash,$total/$count)"
 }
 
 object Metric {
@@ -28,8 +28,8 @@ object Metric {
         //work around below as filterKeys returns a MapLike view instead of a serializable map
         Map() ++ facts.filterKeys(groups.contains(_)), span, timestamp, geohash)
   }
-  case class Value(count: Int, total: Long, max: Long, min: Long) {
-    def + (that: Value) = Value(count + that.count, total + that.total, Math.max(max, that.max), Math.min(min, that.min))
+  case class Value(count: Int, total: Long) {
+    def + (that: Value) = Value(count + that.count, total + that.total)
   }
 
   case class RawBuilder private[model](facts: FactMap, geohash: String = "", optTime: Option[Long]=None) {
@@ -42,12 +42,12 @@ object Metric {
     def decrement(bucket: String) = count(bucket, -1)
     def count(bucket: String, amount: Int = 1) = gauge(bucket, amount)
     def gauge(bucket: String, amount: Int) =
-      Metric(bucket, facts, RAW, optTime getOrElse System.currentTimeMillis, geohash, 1, amount, amount, amount)
+      Metric(bucket, facts, RAW, optTime getOrElse System.currentTimeMillis, geohash, 1, amount)
   }
 
   def apply(key: Key, value: Value): Metric =
     Metric(key.bucket, key.facts, key.span, key.timestamp, key.geohash,
-           value.count, value.total, value.max, value.min)
+           value.count, value.total)
 
   def metric = RawBuilder(Map())
   def withFacts(facts: (String, String)*) = RawBuilder(Map(facts:_*))

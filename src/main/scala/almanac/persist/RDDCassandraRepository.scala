@@ -52,66 +52,51 @@ class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) 
   def metricToTuple(m: Metric) = (
     m.bucket,
     UUID.randomUUID().toString,
-    m.facts,
     m.span.index,
     m.timestamp,
     m.geohash,
     m.count,
-    m.total,
-    m.max,
-    m.min)
+    m.total)
 
   val someColumns = SomeColumns(
     COLUMN_NAMES.BUCKET,
     COLUMN_NAMES.FACTKEY,
-    COLUMN_NAMES.FACTS,
     COLUMN_NAMES.SPAN,
     COLUMN_NAMES.TIMESTAMP,
     COLUMN_NAMES.GEOHASH,
     COLUMN_NAMES.COUNT,
-    COLUMN_NAMES.TOTAL,
-    COLUMN_NAMES.MAX,
-    COLUMN_NAMES.MIN
+    COLUMN_NAMES.TOTAL
   )
 
   def save(rdd: RDD[Metric]) = rdd.map{ m=>(
       m.bucket,
       "",
-      m.facts,
       m.span.index,
       m.timestamp,
       m.geohash,
       m.count,
-      m.total,
-      m.max,
-      m.min)
+      m.total)
   }.saveToCassandra(KEYSPACE, TABLE_NAME, someColumns)
 
   def save(stream: DStream[Metric]) = stream.map { m=>(
       m.bucket,
       "",
-      m.facts,
       m.span.index,
       m.timestamp,
       m.geohash,
       m.count,
-      m.total,
-      m.max,
-      m.min)
+      m.total)
   }.saveToCassandra(KEYSPACE, TABLE_NAME, someColumns)
 
   private def read(whereClause: String): RDD[Metric] = {
     sc.cassandraTable[Metric](KEYSPACE, TABLE_NAME)
       .select(
         COLUMN_NAMES.BUCKET,
-        COLUMN_NAMES.FACTS,
         COLUMN_NAMES.GEOHASH,
         COLUMN_NAMES.SPAN,
         COLUMN_NAMES.TIMESTAMP,
         COLUMN_NAMES.COUNT,
-        COLUMN_NAMES.TOTAL,
-        COLUMN_NAMES.MAX,
-        COLUMN_NAMES.MIN)
+        COLUMN_NAMES.TOTAL)
       .where(whereClause)
   }
 

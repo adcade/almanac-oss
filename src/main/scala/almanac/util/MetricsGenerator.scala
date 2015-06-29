@@ -28,7 +28,7 @@ object MetricsGenerator {
   }
 }
 
-class MetricsReceiver extends Receiver[Metric](MEMORY_AND_DISK_2) with Logging {
+class MetricsReceiver extends Receiver[Metric](MEMORY_ONLY) with Logging {
   private def receive() {
     try {
       logInfo("Start generating random metrics")

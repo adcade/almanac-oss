@@ -1,5 +1,5 @@
 CREATE KEYSPACE IF NOT EXISTS almanac WITH REPLICATION = {
-	'class' : 'NetworkTopologyStrategy', 'datacenter1' : 1
+    'class' : 'NetworkTopologyStrategy', 'datacenter1' : 1
 };
 
 USE almanac;
@@ -7,15 +7,21 @@ USE almanac;
 DROP TABLE IF EXISTS metrics;
 
 CREATE TABLE metrics (
-	factkey varchar,
-	facts map<text, text> static,
-	span int,
-	geohash varchar,
-	ts timestamp,
-	bucket text static,
-	total int,
-	count int,
-	max int,
-	min int,
-	PRIMARY KEY ((bucket, geohash), span, ts, factkey)
+    bucket text,
+    factkey varchar,
+    geohash varchar,
+    span int,
+    timestamp timestamp,
+    total counter,
+    count counter,
+    PRIMARY KEY ((bucket, geohash), span, timestamp, factkey)
+);
+
+DROP TABLE IF EXISTS facts;
+
+CREATE TABLE facts (
+    bucket text,
+    factkey varchar,
+    facts map<text, text> static,
+    PRIMARY KEY (bucket, factkey)
 );
