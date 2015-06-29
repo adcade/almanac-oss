@@ -114,6 +114,11 @@ object GeoRect {
     GeoRect(maxLat x maxLng, minLat x minLng)
   }
 
+  def apply(latBounds: Bounds, lngBounds: Bounds): GeoRect = {
+    val ((minLat, maxLat), (minLng, maxLng)) = (latBounds, lngBounds)
+    GeoRect(maxLat x maxLng, minLat x minLng)
+  }
+
   def apply(co1: Coordinate, co2: Coordinate) = new GeoRect(
     if (co1.lat northOf co2.lat) co1.lat else co2.lat,
     if (co1.lat eastOf  co2.lat) co1.lng else co2.lng,

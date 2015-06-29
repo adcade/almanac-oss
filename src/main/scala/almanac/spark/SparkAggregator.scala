@@ -20,24 +20,24 @@ trait MetricsAggregator[Source] {
   def aggregate(func: Key => Key): Source
 }
 
-trait MetricStreamHandler {
-  def handle(span: TimeSpan, precision: Int, stream: DStream[Metric])
+trait Handler[T, R] {
+  def handle(target: T): R
 }
 
-class SparkMetricsAggregator(stream: DStream[Metric], handler: MetricStreamHandler) {
+class SparkMetricsAggregator(stream: DStream[Metric], streamHandle: (DStream[Metric]) => Unit) {
   import SparkMetricsAggregator._
 
   def geoProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
     // aggregate geo and handle result stream
     val resultStream = stream aggregateByGeoPrecision precision
-    handler.handle(span, precision, resultStream)
+    streamHandle(resultStream)
     resultStream
   }
 
   def timeProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
     // aggregate time and handle result stream
     val resultStream = stream aggregateByTimeSpan span
-    handler.handle(span, precision, resultStream)
+    streamHandle(resultStream)
     resultStream
   }
 
@@ -46,6 +46,8 @@ class SparkMetricsAggregator(stream: DStream[Metric], handler: MetricStreamHandl
    * then aggregate on each level of timeSchedules and geoSchedules like below:
    *
    * Seq(HOUR, DAY, ALL_TIME) Seq(8, 4, WORLDWIDE)
+   *
+   * in this case HOUR is the intial time span level for aggregation
    *
    * 12, RAW -> initial stream -> 8, HOUR -> DAY -> ALL_TIME
    *                                 |
@@ -56,17 +58,16 @@ class SparkMetricsAggregator(stream: DStream[Metric], handler: MetricStreamHandl
    *                      WORLDWIDE, HOUR -> DAY -> ALL_TIME
    *
    * the return value is the last aggregated stream in the above case: WORLDWIDE / ALL_TIME
-   * @param timeSchedules time spans to be aggregated
-   * @param geoSchedules geo precision levels to be aggregated
+   * @param schedules time span levels and geo precision levels to be aggregated
    * @return the stream of the last aggregated stream
    */
-  def schedule(geoSchedules: List[Int], timeSchedules: List[TimeSpan]) = {
+  def schedule(schedules: AggregationSchedules) = {
     // aggregate first level of time span
-    val intialTimeSchedule :: otherTimeSchedules = timeSchedules
-    val initialStream = stream aggregateByTimeSpan intialTimeSchedule
+    val intialTimeSpan :: otherTimeSchedules = schedules.timeSpans
+    val initialStream = stream aggregateByTimeSpan intialTimeSpan
     // aggregate
-    (initialStream /: geoSchedules) ((tranStream, precision) => {
-      (geoProcess(tranStream, precision, intialTimeSchedule) /: otherTimeSchedules)(
+    (initialStream /: schedules.geoPrecisions) ((tranStream, precision) => {
+      (geoProcess(tranStream, precision, intialTimeSpan) /: otherTimeSchedules)(
         timeProcess(_, precision, _)
       )
       tranStream
@@ -75,6 +76,8 @@ class SparkMetricsAggregator(stream: DStream[Metric], handler: MetricStreamHandl
 }
 
 object SparkMetricsAggregator {
+  case class AggregationSchedules(geoPrecisions: Seq[Int], timeSpans: Seq[TimeSpan])
+
   implicit class RDDMetricsExtension(val source: RDD[Metric]) extends MetricsAggregator[RDD[Metric]]  {
     override def aggregate(func: Key => Key) =
       source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
@@ -85,7 +88,8 @@ object SparkMetricsAggregator {
       source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
   }
 
-  def apply(stream: DStream[Metric], handler: MetricStreamHandler) = new SparkMetricsAggregator(stream, handler)
+  def apply(stream: DStream[Metric], streamHandle: (DStream[Metric]) => Unit) =
+    new SparkMetricsAggregator(stream, streamHandle)
 
 }
 

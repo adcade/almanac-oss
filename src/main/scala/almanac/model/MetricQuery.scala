@@ -14,6 +14,10 @@ case class TimeFilter(span: TimeSpan, fromTime: Long, toTime: Long) {
 
 object GeoFilter {
   val WORLDWIDE: GeoFilter = new GeoFilter(0, GeoRect(0, 0, 0, 0))
+
+  def apply(geohash: String): GeoFilter = {
+    GeoFilter(geohash.length, GeoRect(geohash))
+  }
 }
 
 case class GeoFilter(precision: Int, rect: GeoRect) {
@@ -76,6 +80,7 @@ object MetricsQuery {
     def time(filter: TimeFilter) = Builder(buckets, criteria, groupNames, orders, geoFilter, filter, limit, skip)
     def time(span: TimeSpan, fromTime: Long, toTime: Long): Builder = time(TimeFilter(span, fromTime, toTime))
     def locate(filter: GeoFilter): Builder = Builder(buckets, criteria, groupNames, orders, filter, timeFilter, limit, skip)
+    def locate(geohash: String): Builder = locate(GeoFilter(geohash))
     def locate(precision: Int, rect: GeoRect): Builder = locate(GeoFilter(precision, rect))
     def limit(limit: Int): Builder = Builder(buckets, criteria, groupNames, orders, geoFilter, timeFilter, limit, skip)
     def skip(skip: Int) = Builder(buckets, criteria, groupNames, orders, geoFilter, timeFilter, limit, skip)
