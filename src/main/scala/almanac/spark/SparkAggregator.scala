@@ -70,6 +70,7 @@ class SparkMetricsAggregator(stream: DStream[Metric], streamHandle: (DStream[Met
       (geoProcess(tranStream, precision, intialTimeSpan) /: otherTimeSchedules)(
         timeProcess(_, precision, _)
       )
+      // TODO: save facts!
       tranStream
     })
   }

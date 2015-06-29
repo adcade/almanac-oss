@@ -11,9 +11,6 @@ import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.mutable
 
-/**
- * Created by binliu on 6/28/15.
- */
 class CassandraRddDaoSuite extends FunSuite with Matchers{
 
   val conf = new SparkConf().setAppName("almanac")

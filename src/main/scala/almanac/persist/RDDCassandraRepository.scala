@@ -1,12 +1,11 @@
 package almanac.persist
 
-import java.util.UUID
-
 import almanac.model.GeoFilter.WORLDWIDE
 import almanac.model.TimeFilter.ALL_TIME
 import almanac.model._
 import almanac.persist.RDDCassandraRepository._
 import almanac.spark.SparkMetricsAggregator.AggregationSchedules
+import almanac.util.MD5Helper.md5
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.streaming._
 import com.datastax.spark.connector.types._
@@ -29,7 +28,9 @@ object RDDCassandraRepository {
   }
 
   private val KEYSPACE = "almanac"
-  private val TABLE_NAME = "metrics"
+  private val METRICS_TABLE = "metrics"
+  private val FACTS_TABLE = "facts"
+  private val FACTKEY_OF_EMPTY = "d41d8cd98f00b204e9800998ecf8427e"
 
   private object COLUMN_NAMES {
     val BUCKET = "bucket"
@@ -51,14 +52,14 @@ class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) 
 
   def metricToTuple(m: Metric) = (
     m.bucket,
-    UUID.randomUUID().toString,
+    md5(m.facts),
     m.span.index,
     m.timestamp,
     m.geohash,
     m.count,
     m.total)
 
-  val someColumns = SomeColumns(
+  val metricColumns = SomeColumns(
     COLUMN_NAMES.BUCKET,
     COLUMN_NAMES.FACTKEY,
     COLUMN_NAMES.SPAN,
@@ -68,28 +69,37 @@ class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) 
     COLUMN_NAMES.TOTAL
   )
 
+  def saveFacts(rdd: RDD[Metric]) = rdd.map(_.key ~ WORLDWIDE.precision ~ ALL_TIME.span)
+    .distinct
+    .map { mkey => (mkey.bucket, md5(mkey.facts), mkey.facts) }
+    .saveToCassandra(KEYSPACE, FACTS_TABLE,
+      SomeColumns(COLUMN_NAMES.BUCKET,
+                  COLUMN_NAMES.FACTKEY,
+                  COLUMN_NAMES.FACTS)
+    )
+
   def save(rdd: RDD[Metric]) = rdd.map{ m=>(
       m.bucket,
-      "",
+      md5(m.facts),
       m.span.index,
       m.timestamp,
       m.geohash,
       m.count,
       m.total)
-  }.saveToCassandra(KEYSPACE, TABLE_NAME, someColumns)
+  }.saveToCassandra(KEYSPACE, METRICS_TABLE, metricColumns)
 
   def save(stream: DStream[Metric]) = stream.map { m=>(
       m.bucket,
-      "",
+      md5(m.facts),
       m.span.index,
       m.timestamp,
       m.geohash,
       m.count,
       m.total)
-  }.saveToCassandra(KEYSPACE, TABLE_NAME, someColumns)
+  }.saveToCassandra(KEYSPACE, METRICS_TABLE, metricColumns)
 
   private def read(whereClause: String): RDD[Metric] = {
-    sc.cassandraTable[Metric](KEYSPACE, TABLE_NAME)
+    sc.cassandraTable[Metric](KEYSPACE, METRICS_TABLE)
       .select(
         COLUMN_NAMES.BUCKET,
         COLUMN_NAMES.GEOHASH,
