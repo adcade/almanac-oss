@@ -4,8 +4,8 @@ import almanac.model.GeoFilter.WORLDWIDE
 import almanac.model.TimeFilter.ALL_TIME
 import almanac.model._
 import almanac.persist.RDDCassandraRepository._
-import almanac.spark.SparkMetricsAggregator.AggregationSchedules
-import almanac.util.MD5Helper.md5
+import almanac.spark.SparkMetricsAggregator._
+import almanac.util.MD5Helper._
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.streaming._
 import com.datastax.spark.connector.types._
@@ -44,6 +44,8 @@ object RDDCassandraRepository {
     val TIMESTAMP = "timestamp"
     val TOTAL = "total"
   }
+
+  case class FactIndex(bucket: String, geohash: String, factkey: String, facts: Map[String, String])
 }
 
 class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) extends Serializable {
@@ -52,7 +54,7 @@ class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) 
 
   def metricToTuple(m: Metric) = (
     m.bucket,
-    md5(m.facts),
+    signature(m.facts),
     m.span.index,
     m.timestamp,
     m.geohash,
@@ -69,18 +71,19 @@ class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) 
     COLUMN_NAMES.TOTAL
   )
 
-  def saveFacts(rdd: RDD[Metric]) = rdd.map(_.key ~ WORLDWIDE.precision ~ ALL_TIME.span)
+  def saveFacts(rdd: RDD[Metric]) = rdd.aggregateByTimeSpan(ALL_TIME.span)
     .distinct
-    .map { mkey => (mkey.bucket, md5(mkey.facts), mkey.facts) }
+    .map { mkey => FactIndex(mkey.bucket, mkey.geohash, signature(mkey.facts), mkey.facts) }
     .saveToCassandra(KEYSPACE, FACTS_TABLE,
       SomeColumns(COLUMN_NAMES.BUCKET,
+                  COLUMN_NAMES.GEOHASH,
                   COLUMN_NAMES.FACTKEY,
                   COLUMN_NAMES.FACTS)
     )
 
   def save(rdd: RDD[Metric]) = rdd.map{ m=>(
       m.bucket,
-      md5(m.facts),
+      signature(m.facts),
       m.span.index,
       m.timestamp,
       m.geohash,
@@ -90,13 +93,34 @@ class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) 
 
   def save(stream: DStream[Metric]) = stream.map { m=>(
       m.bucket,
-      md5(m.facts),
+      signature(m.facts),
       m.span.index,
       m.timestamp,
       m.geohash,
       m.count,
       m.total)
   }.saveToCassandra(KEYSPACE, METRICS_TABLE, metricColumns)
+
+  def readFacts(buckets: Seq[String], geohashes: Seq[String]): RDD[FactIndex] = {
+    require(buckets.size > 0, "can't pass in empty buckets when reading facts")
+    require(geohashes.size > 0, "can't pass in empty geohashes when reading facts")
+
+    buckets.map { bucket => {
+      val geoConditions = geohashes.map(gh => s"'$gh'").mkString(", ")
+      val whereClause = List(
+        s"${COLUMN_NAMES.GEOHASH} IN ($geoConditions)", // geohash IN ('$gh1', '$gh2', ...)
+        s"${COLUMN_NAMES.BUCKET} = '$bucket'"           // bucket = '$bucket'
+      ).mkString(" and ")
+
+      sc.cassandraTable[FactIndex](KEYSPACE, FACTS_TABLE)
+        .select(
+          COLUMN_NAMES.BUCKET,
+          COLUMN_NAMES.GEOHASH,
+          COLUMN_NAMES.FACTKEY,
+          COLUMN_NAMES.FACTS)
+        .where(whereClause)
+    } }.reduceLeft[RDD[FactIndex]](_ union _)
+  }
 
   private def read(whereClause: String): RDD[Metric] = {
     sc.cassandraTable[Metric](KEYSPACE, METRICS_TABLE)
@@ -110,10 +134,10 @@ class RDDCassandraRepository(sc: SparkContext, schedules: AggregationSchedules) 
       .where(whereClause)
   }
 
-  def read(bucket: String, geoHash: String, span: TimeSpan): RDD[Metric] = {
+  def read(bucket: String, geohash: String, span: TimeSpan): RDD[Metric] = {
     val whereClause = List(
       s"${COLUMN_NAMES.BUCKET} = '$bucket'",
-      s"${COLUMN_NAMES.GEOHASH} = '$geoHash'",
+      s"${COLUMN_NAMES.GEOHASH} = '$geohash'",
       s"${COLUMN_NAMES.SPAN} = ${span.index}"
     ).mkString(" and ")
 

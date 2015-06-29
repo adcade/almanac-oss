@@ -1,11 +1,12 @@
 import almanac.model.MetricsQuery._
-import almanac.model.TimeSpan.{ALL_TIME, HOUR, RAW}
+import almanac.model.TimeSpan._
 import almanac.model._
-import almanac.persist.{RDDCassandraRepository, RDDCassandraRepository$}
+import almanac.persist.RDDCassandraRepository
+import almanac.spark.SparkMetricsAggregator
 import almanac.spark.SparkMetricsAggregator.AggregationSchedules
 import almanac.util.MetricsGenerator
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{FunSuite, Matchers}
 
@@ -16,45 +17,73 @@ class CassandraRddDaoSuite extends FunSuite with Matchers{
   val conf = new SparkConf().setAppName("almanac")
     .set("spark.cassandra.connection.host", "dev")
   val sc = new SparkContext("local[4]", "test", conf)
-  val ssc = new StreamingContext(sc, Seconds(1))
-  val schedules = AggregationSchedules(List(4, 0), List(HOUR, ALL_TIME))
+  val ssc = new StreamingContext(sc, Milliseconds(100))
+  val schedules = AggregationSchedules(List(4), List(HOUR))
 
-  test("test handle") {
+  test("test metrics dstream save") {
     val dao = new RDDCassandraRepository(sc, schedules)
+
     val q = mutable.Queue[RDD[Metric]]()
-    for (i <- 1 to 10) { _: Int =>
-      q.enqueue(sc.parallelize(MetricsGenerator.generateRawWithGeo(100)))
-    }
     val stream = ssc.queueStream(q, true)
     dao.save(stream)
-    //ssc.awaitTermination()
+
+    for (_ <- 1 to 3) {
+      q += sc.makeRDD(MetricsGenerator.generateRawWithGeo(10))
+    }
+    ssc.start()
+    ssc.awaitTerminationOrTimeout(400)
+
   }
 
-  test("test save") {
-    val fromTime = System.currentTimeMillis()
-    val metrics = MetricsGenerator.generateRawWithGeo(10)
-    val toTime = fromTime + 1000000
-
-    val rdd = sc.parallelize(metrics)
+  test("test metrics rdd save") {
     val dao = new RDDCassandraRepository(sc, schedules)
-    dao.save(rdd)
-//    dao.read(metrics.head.bucket, metrics.head.geohash, metrics.head.span)
-//      .collect().foreach(println)
+    dao.save(sc.parallelize(MetricsGenerator.generateRawWithGeo(10)))
+  }
+
+  test("test facts with geo rdd") {
+    import SparkMetricsAggregator._
+    val dao = new RDDCassandraRepository(sc, schedules)
+    val metrics = MetricsGenerator.generateRawWithGeo(10)
+    val rdd = sc.makeRDD(metrics).aggregateByGeoPrecision(4)
+    dao.saveFacts(rdd)
+    val distinctBuckets = metrics.map(_.bucket).toSet.toSeq
+    val distinctGeohashes = GeoRect(MetricsGenerator.latRange, MetricsGenerator.lngRange).geohashes(4)
+    println(distinctGeohashes)
+    dao.readFacts(distinctBuckets, distinctGeohashes.toSeq).collect().foreach(println)
+  }
+
+  test("test facts rdd") {
+    import SparkMetricsAggregator._
+    val dao = new RDDCassandraRepository(sc, schedules)
+    val metrics = MetricsGenerator.generateRawWithFacts(10)
+    val rdd = sc.makeRDD(metrics).aggregateByGeoPrecision(4)
+    dao.saveFacts(rdd)
+
+    val distinctBuckets = metrics.map(_.bucket).toSet.toSeq
+    dao.readFacts(distinctBuckets, Seq("")).collect().foreach(println)
+  }
+
+  test("test metrics query") {
+    val fromTime = System.currentTimeMillis()
+    // make stream
+    val q = mutable.Queue[RDD[Metric]]()
+    val metrics = MetricsGenerator.generateRawWithGeo(10)
+    q += sc.makeRDD(metrics)
+    val stream = ssc.queueStream(q, true)
+
+    // save with almanac aggregator
+    val dao = new RDDCassandraRepository(sc, schedules)
+    SparkMetricsAggregator(stream, dao.save).schedule(schedules)
+    ssc.start()
+    ssc.awaitTerminationOrTimeout(150)
 
     val distinctBuckets = metrics.map(_.bucket).toSet.toSeq
 
     dao.read(
       select(distinctBuckets:_*)
-        .locate(12, GeoRect(40.8, 74.0, 40.799, 73.999))
-        .time(RAW, fromTime, toTime).query
+        .locate(4, GeoRect(MetricsGenerator.latRange, MetricsGenerator.lngRange))
+        .time(HOUR, fromTime - 3600000, fromTime + 3600000).query
     ).collect().foreach(println)
 
-//    metrics.foreach { metric =>
-//      val inDb = dao.read(metric.bucket, metric.geohash, metric.span)
-//      inDb.foreach { m =>
-//        println(m)
-//      }
-//      //println(inDb)
-//    }
   }
 }

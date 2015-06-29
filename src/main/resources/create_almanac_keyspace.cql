@@ -8,8 +8,8 @@ DROP TABLE IF EXISTS metrics;
 
 CREATE TABLE metrics (
     bucket text,
-    factkey varchar,
     geohash varchar,
+    factkey varchar,
     span int,
     timestamp timestamp,
     total counter,
@@ -21,7 +21,8 @@ DROP TABLE IF EXISTS facts;
 
 CREATE TABLE facts (
     bucket text,
+    geohash varchar,
     factkey varchar,
     facts map<text, text> static,
-    PRIMARY KEY (bucket, factkey)
+    PRIMARY KEY ((bucket, geohash), factkey)
 );
