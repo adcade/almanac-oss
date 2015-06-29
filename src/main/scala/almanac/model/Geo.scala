@@ -160,7 +160,7 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
   def contains(other: GeoRect): Boolean = contains(other.south x other.west) && contains(other.north x other.east)
   def contains(geohash: String): Boolean = contains(GeoRect(geohash))
 
-  def geohashes(precision: Int, inner: Boolean = true): Set[String] = {
+  def geohashes(precision: Int, inner: Boolean = false): Set[String] = {
     def _geohashes(prefix: String): Seq[String] = {
       if (prefix.length >= precision)
         if (inner) Seq.empty else Seq(prefix)
@@ -172,6 +172,28 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
         }
     }
     _geohashes("").toSet
+  }
+
+  def geohashesWithLimit(limit: Int, inner: Boolean = false): Set[String] = {
+    ((Set.empty[String], true) /: (1 to 12)) { case ((ghs, continue), p) =>
+      if (continue) {
+        val newResult = geohashes(p, inner)
+        if (newResult.size > limit) (ghs, false)
+        else (newResult, true)
+      } else {
+        (ghs, continue)
+      }
+    }._1
+  }
+
+  def geohashesWithLowestPrecision(inner: Boolean = false): Set[String] = {
+    var result = Set.empty[String]
+    var precision = 0
+    do {
+      precision += 1
+      result = geohashes(precision, inner)
+    } while (result.size == 0)
+    result
   }
 
 }

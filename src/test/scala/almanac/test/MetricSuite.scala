@@ -1,3 +1,5 @@
+package almanac.test
+
 import almanac.model.TimeSpan
 import almanac.model.TimeSpan._
 import org.joda.time.DateTime

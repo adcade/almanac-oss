@@ -1,7 +1,7 @@
 package almanac
 
 import almanac.model.TimeSpan._
-import almanac.persist.RDDCassandraRepository
+import almanac.persist.CassandraMetricRDDRepository
 import almanac.spark.SparkMetricsAggregator
 import almanac.spark.SparkMetricsAggregator.AggregationSchedules
 import almanac.util.MetricsReceiver
@@ -21,8 +21,8 @@ object Almanac extends App {
 //  val aggregator = SparkMetricsAggregator(metricsStream, new MetricStreamHandler {
 //    override def handle(span: TimeSpan, precision: Int, stream: DStream[Metric]) = stream.print()
 //  }).schedule(geoSchedules, timeSchedules)
-  val rddRepo = new RDDCassandraRepository(sc, schedules)
-  SparkMetricsAggregator(metricsStream, rddRepo.save).schedule(schedules)
+  val rddRepo = new CassandraMetricRDDRepository(sc, schedules)
+  SparkMetricsAggregator(metricsStream, rddRepo).schedule(schedules)
 
   ssc.start()
   ssc.awaitTermination()

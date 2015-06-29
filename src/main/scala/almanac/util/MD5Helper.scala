@@ -5,7 +5,8 @@ import java.security.MessageDigest
 object MD5Helper {
 
   def md5(source: String): String = {
-    MessageDigest.getInstance("MD5").digest(source.getBytes)
+    MessageDigest.getInstance("MD5")
+      .digest(source.getBytes)
       .map("%02x".format(_))
       .mkString
   }

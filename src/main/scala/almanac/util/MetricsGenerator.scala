@@ -4,6 +4,7 @@ import almanac.model.Coordinate._
 import almanac.model.GeoHash.Bounds
 import almanac.model.Metric
 import almanac.model.Metric._
+import almanac.util.MetricsGenerator._
 import org.apache.spark.Logging
 import org.apache.spark.storage.StorageLevel._
 import org.apache.spark.streaming.receiver.Receiver
@@ -40,7 +41,7 @@ class MetricsReceiver extends Receiver[Metric](MEMORY_ONLY) with Logging {
     try {
       logInfo("Start generating random metrics")
       while (!isStopped) {
-        val metrics = MetricsGenerator.generateRawWithGeo(500)
+        val metrics = (0 until 500).map(_=>generateRaw)
         logInfo("sending: " + metrics)
         store(metrics.iterator)
         Thread.sleep(1000)

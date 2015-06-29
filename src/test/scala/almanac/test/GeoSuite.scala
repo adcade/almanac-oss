@@ -1,6 +1,10 @@
-import almanac.model.{GeoHash, GeoRect, Coordinate}
+package almanac.test
+
+import almanac.model.Coordinate._
+import almanac.model.{Coordinate, GeoHash, GeoRect}
 import org.scalatest.{FunSuite, Matchers}
-import Coordinate._
+
+import scala.util.Random
 
 class GeoSuite extends FunSuite with Matchers {
   import GeoHash._
@@ -89,5 +93,51 @@ class GeoSuite extends FunSuite with Matchers {
 
     rect3.geohashes(7, inner=true) should be (Set())
     rect3.geohashes(7, inner=false) should be (Set("s1z0gs3", "s1z0gs6", "s1z0gs9", "s1z0gsd"))
+  }
+
+  test ("geohash experiment") {
+    val geohash = "dr5ru1pcr6gu"
+
+    for (p <- 0 to 8) {
+      val rect = GeoRect(geohash.substring(0, p))
+      println(geohash.substring(0, p), (rect.top - rect.bottom) * (rect.left - rect.right))
+    }
+
+    for {pLat <- 0 to 5
+         pLng <- 0 to 5
+         pGeohash <- 1 to 8
+    } {
+      val dLat = 1 * math.pow(0.1, pLat)
+      val dLng = 1 * math.pow(0.1, pLng)
+      val rect = GeoRect(dLat, dLng, 0, 0)
+      val pLog = math.log10(dLat * dLng)
+      val geohashes = rect.geohashes(pGeohash)
+      if (geohashes.size > 0 && geohashes.size < 100)
+        println(pLat, pLng, -math.round(pLog), pGeohash, geohashes.size)
+    }
+  }
+
+  test ("geohash experiment2") {
+    val ran = new Random
+    def random(b: Bounds) = ran.nextDouble * (b._2 - b._1) + b._1
+    var max = 0
+    for (i <- 0 to 10000) {
+      val rect = GeoRect(random(LAT_RANGE) x random(LNG_RANGE), random(LAT_RANGE) x random(LNG_RANGE))
+//      val geohashes = rect.geohashesWithLimit(100)
+      val geohashes = rect.geohashesWithLowestPrecision()
+      if (geohashes.size > 1) {
+        if (geohashes.size > max) max = geohashes.size
+        println(geohashes.size, geohashes)
+      }
+    }
+
+    println(max)
+
+//    println(GeoRect(48.93840015820638,-138.875716813862,48.93840015820638,-138.875716813862).geohashes(12))
+//    GeoRect(48.93840015820638,-138.875716813862,48.93840015820638,-138.875716813862)0
+//    GeoRect(56.975747123881604,148.50458245836478,-45.28166729512666,65.14182092940422)64
+//    GeoRect(6.887932568316444,43.17930519848326,6.887932568316444,43.17930519848326)0
+//    GeoRect(58.19985902552139,-113.13142544147499,58.19985902552139,-113.13142544147499)0
+//    GeoRect(45.291487177945385,164.60501299708545,21.182342120963654,164.60501299708545)
   }
 }

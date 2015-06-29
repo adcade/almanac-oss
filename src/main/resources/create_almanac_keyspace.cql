@@ -23,6 +23,6 @@ CREATE TABLE facts (
     bucket text,
     geohash varchar,
     factkey varchar,
-    facts map<text, text> static,
+    facts map<text, text>,
     PRIMARY KEY ((bucket, geohash), factkey)
 );

@@ -3,6 +3,7 @@ package almanac.spark
 import akka.actor.{Actor, ActorRef}
 import almanac.model.Metric._
 import almanac.model.{Metric, TimeSpan}
+import almanac.persist.MetricRDDRepository
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.receiver.ActorHelper
@@ -20,24 +21,34 @@ trait MetricsAggregator[Source] {
   def aggregate(func: Key => Key): Source
 }
 
-trait Handler[T, R] {
-  def handle(target: T): R
-}
-
-class SparkMetricsAggregator(stream: DStream[Metric], streamHandle: (DStream[Metric]) => Unit) {
+class SparkMetricsAggregator(stream: DStream[Metric], repo: MetricRDDRepository) {
   import SparkMetricsAggregator._
 
+  /**
+   * aggregate geo and save result stream
+   *
+   * @param stream
+   * @param precision
+   * @param span
+   * @return
+   */
   def geoProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
-    // aggregate geo and handle result stream
     val resultStream = stream aggregateByGeoPrecision precision
-    streamHandle(resultStream)
+    repo.save(precision, span, resultStream)
     resultStream
   }
 
+  /**
+   * aggregate time and handle result stream
+   *
+   * @param stream
+   * @param precision
+   * @param span
+   * @return
+   */
   def timeProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
-    // aggregate time and handle result stream
     val resultStream = stream aggregateByTimeSpan span
-    streamHandle(resultStream)
+    repo.save(precision, span, resultStream)
     resultStream
   }
 
@@ -67,11 +78,13 @@ class SparkMetricsAggregator(stream: DStream[Metric], streamHandle: (DStream[Met
     val initialStream = stream aggregateByTimeSpan intialTimeSpan
     // aggregate
     (initialStream /: schedules.geoPrecisions) ((tranStream, precision) => {
-      (geoProcess(tranStream, precision, intialTimeSpan) /: otherTimeSchedules)(
-        timeProcess(_, precision, _)
-      )
-      // TODO: save facts!
-      tranStream
+      // aggregate geo and save result stream
+      (geoProcess(tranStream, precision, intialTimeSpan) /: otherTimeSchedules) ( (geoResult, span) => {
+        // aggregate fact and handle result stream
+        repo.saveFacts(geoResult)
+        // aggregate time and handle result stream
+        timeProcess(geoResult, precision, span)
+      })
     })
   }
 }
@@ -89,8 +102,8 @@ object SparkMetricsAggregator {
       source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
   }
 
-  def apply(stream: DStream[Metric], streamHandle: (DStream[Metric]) => Unit) =
-    new SparkMetricsAggregator(stream, streamHandle)
+  def apply(stream: DStream[Metric], repo: MetricRDDRepository) =
+    new SparkMetricsAggregator(stream, repo)
 
 }
 
