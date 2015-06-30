@@ -4,13 +4,12 @@ import almanac.model.MetricsQuery._
 import almanac.model.TimeSpan._
 import almanac.model._
 import almanac.persist.CassandraMetricRDDRepository
-import almanac.spark.SparkMetricsAggregator
-import almanac.spark.SparkMetricsAggregator.AggregationSchedules
-import almanac.util.MetricsGenerator
+import almanac.spark.SparkMetricsAggregator._
 import almanac.util.MetricsGenerator._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
+import org.joda.time.DateTime
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.mutable
@@ -35,7 +34,6 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
     }
     ssc.start()
     ssc.awaitTerminationOrTimeout(400)
-
   }
 
   test("test metrics rdd save") {
@@ -44,48 +42,62 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
   }
 
   test("test facts with geo rdd") {
-    import SparkMetricsAggregator._
     val repo = new CassandraMetricRDDRepository(sc, schedules)
     val metrics = (1 to 10) map (_ => generateRawWithGeo)
     val rdd = sc.makeRDD(metrics).aggregateByGeoPrecision(4)
+
     repo.saveFacts(rdd)
+
     val distinctBuckets = metrics.map(_.bucket).toSet
     val distinctGeohashes = GeoRect(latRange, lngRange).geohashes(4)
-    println(distinctGeohashes)
+
     repo.readFacts(distinctBuckets, distinctGeohashes).collect().foreach(println)
   }
 
   test("test facts rdd") {
-    import SparkMetricsAggregator._
     val repo = new CassandraMetricRDDRepository(sc, schedules)
     val metrics = (1 to 10) map (_ => generateRawWithFacts)
     val rdd = sc.makeRDD(metrics).aggregateByGeoPrecision(4)
+
     repo.saveFacts(rdd)
 
     val distinctBuckets = metrics.map(_.bucket).toSet
+
     repo.readFacts(distinctBuckets, Set("")).collect().foreach(println)
   }
 
   test("test metrics query") {
-    val fromTime = System.currentTimeMillis()
-//    // make stream
-//    val q = mutable.Queue[RDD[Metric]]()
-//    val metrics = (1 to 10) map (_ => generateRawWithGeo)
-//    q += sc.makeRDD(metrics)
-//    val stream = ssc.queueStream(q, true)
-//
-//    // save with almanac aggregator
     val repo = new CassandraMetricRDDRepository(sc, schedules)
-//    SparkMetricsAggregator(stream, dao).schedule(schedules)
-//    ssc.start()
-//    ssc.awaitTerminationOrTimeout(300)
 
-//    val distinctBuckets = metrics.map(_.bucket).toSet.toSeq
+    val timestamp = new DateTime(2001, 9, 8, 21, 46, 40).getMillis
 
-    val query = select(MetricsGenerator.buckets:_*)
-            .locate(4, GeoRect(latRange, lngRange))
-            .time(HOUR, fromTime - 7200000, fromTime + 7200000).query
+    val geohash = "dr5ru1pcr6gu"
+    val geohash1 = "dr5ru1p"
+    val geohash2 = "dr5ru1q"
+    val facts1 = Map("device"->"pc", "os"->"windows")
+    val facts2 = Map("device"->"mobile", "os"->"osx")
 
-    repo.read(query).foreach(println)
+    val metrics = Seq(
+      Metric("impression", facts1, HOUR, timestamp, geohash1, 62, 824),
+      Metric("impression", facts2, HOUR, timestamp, geohash2, 62, 824),
+      Metric("exit", facts1, HOUR, timestamp, geohash2, 62, 824),
+      Metric("exit", facts2, HOUR, timestamp, geohash1, 62, 824)
+    )
+    val rdd = sc.parallelize(metrics)
+    repo save rdd
+    repo saveFacts rdd
+
+    println("saved")
+
+    println(new DateTime(HOUR(timestamp)), new DateTime(HOUR(timestamp) + 3600000))
+
+    val query = select("impression", "exit")
+            .locate(7, GeoRect("dr5ru1"))
+            .time(HOUR, HOUR(timestamp) - 36000000, HOUR(timestamp) + 36000000)
+            .query
+
+    repo read query foreach println
+
+    println("read")
   }
 }

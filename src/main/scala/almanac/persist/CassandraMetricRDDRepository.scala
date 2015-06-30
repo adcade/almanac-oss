@@ -12,7 +12,6 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
 
-import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
 object CassandraMetricRDDRepository {
@@ -32,17 +31,37 @@ object CassandraMetricRDDRepository {
   private val FACTKEY_OF_EMPTY = "d41d8cd98f00b204e9800998ecf8427e"
 
   private[almanac] object COLUMN_NAMES {
-    val BUCKET = "bucket"
-    val COUNT = "count"
-    val FACT_KEY = "factkey"
-    val FACTS = "facts"
-    val GEOHASH = "geohash"
-    val MAX = "max"
-    val MIN = "min"
-    val SPAN = "span"
+    val BUCKET    = "bucket"
+    val COUNT     = "count"
+    val FACT_KEY  = "factkey"
+    val FACTS     = "facts"
+    val GEOHASH   = "geohash"
+    val MAX       = "max"
+    val MIN       = "min"
+    val SPAN      = "span"
     val TIMESTAMP = "timestamp"
-    val TOTAL = "total"
+    val TOTAL     = "total"
   }
+
+  val metricToTuple = (m: Metric) => (
+    m.bucket,
+    m.geohash,
+    signature(m.facts),
+    m.span.index,
+    m.timestamp,
+    m.count,
+    m.total
+    )
+
+  val metricColumns = SomeColumns(
+    COLUMN_NAMES.BUCKET,
+    COLUMN_NAMES.GEOHASH,
+    COLUMN_NAMES.FACT_KEY,
+    COLUMN_NAMES.SPAN,
+    COLUMN_NAMES.TIMESTAMP,
+    COLUMN_NAMES.COUNT,
+    COLUMN_NAMES.TOTAL
+  )
 
   case class FactIndex(bucket: String, geohash: String, factkey: String, facts: Map[String, String])
 }
@@ -51,63 +70,27 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
   TypeConverter.registerConverter(IntToTimeSpanConverter)
   TypeConverter.registerConverter(TimeSpanToIntConverter)
 
-  def metricToTuple(m: Metric) = (
-    m.bucket,
-    signature(m.facts),
-    m.span.index,
-    m.timestamp,
-    m.geohash,
-    m.count,
-    m.total)
-
-  val metricColumns = SomeColumns(
-    COLUMN_NAMES.BUCKET,
-    COLUMN_NAMES.FACT_KEY,
-    COLUMN_NAMES.SPAN,
-    COLUMN_NAMES.TIMESTAMP,
-    COLUMN_NAMES.GEOHASH,
-    COLUMN_NAMES.COUNT,
-    COLUMN_NAMES.TOTAL
-  )
-
-  override def saveFacts(rdd: RDD[Metric]) = {
-    rdd.aggregateByTimeSpan(ALL_TIME.span)
+  override def saveFacts(rdd: RDD[Metric]) = rdd
+      .aggregateByTimeSpan(ALL_TIME.span)
       .distinct()
-      .map { mkey => FactIndex(
-        mkey.bucket,
-        mkey.geohash,
-        signature(mkey.facts),
-        mkey.facts) }
+      .map { mkey => FactIndex(mkey.bucket, mkey.geohash, signature(mkey.facts), mkey.facts) }
       .saveToCassandra(KEYSPACE, FACTS_TABLE)
-  }
-
 
   override def saveFacts(stream: DStream[Metric]) = stream foreachRDD ( saveFacts(_) )
 
-  def save(rdd: RDD[Metric]) = rdd.map{ m=>(
-      m.bucket,
-      signature(m.facts),
-      m.span.index,
-      m.timestamp,
-      m.geohash,
-      m.count,
-      m.total)
-  }.saveToCassandra(KEYSPACE, METRICS_TABLE, metricColumns)
+  def save(rdd: RDD[Metric]) = rdd map metricToTuple saveToCassandra(KEYSPACE, METRICS_TABLE, metricColumns)
 
   override def save(precision: Int, span: TimeSpan, stream: RDD[Metric]) = save(stream)
 
   override def save(precision: Int, span: TimeSpan, stream: DStream[Metric]) = stream foreachRDD ( save(_) )
 
-  def readFacts(buckets: Set[String], geohashes: Set[String]): RDD[FactIndex] = {
+  def readFacts(buckets: Set[String], geoFilter: GeoFilter): RDD[FactIndex] = {
     require(buckets.nonEmpty, "can't pass in empty buckets when reading facts")
-    require(geohashes.nonEmpty, "can't pass in empty geohashes when reading facts")
 
     buckets.map { bucket => {
-      val geoConditions = geohashes.map(gh => s"'$gh'").mkString(", ")
-      val whereClause = List(
-        s"${COLUMN_NAMES.GEOHASH} IN ($geoConditions)", // geohash IN ('$gh1', '$gh2', ...)
-        s"${COLUMN_NAMES.BUCKET} = '$bucket'"           // bucket = '$bucket'
-      ).mkString(" and ")
+      val whereClause = all(
+        bucketConditions(bucket), // bucket = '$bucket'
+        geoConditions(geoFilter)) // geohash IN ('$gh1', '$gh2', ...)
 
       sc.cassandraTable[FactIndex](KEYSPACE, FACTS_TABLE)
         .select(
@@ -133,7 +116,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
 
   def read(bucket: String, geohash: String, span: TimeSpan): RDD[Metric] = {
     val whereClause = List(
-      s"${COLUMN_NAMES.BUCKET} = '$bucket'",
+      bucketConditions(bucket),
       s"${COLUMN_NAMES.GEOHASH} = '$geohash'",
       s"${COLUMN_NAMES.SPAN} = ${span.index}"
     ).mkString(" and ")
@@ -142,7 +125,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
   }
 
   def read(query: MetricsQuery): RDD[Metric] = {
-    readFacts(query.buckets, query.geoFilter.rect.geohashes(query.geoFilter.precision))
+    readFacts(query.buckets, query.geoFilter)
       .joinWithCassandraTable[CassandraRow](KEYSPACE, METRICS_TABLE)
       .select(
         COLUMN_NAMES.BUCKET,
@@ -151,9 +134,8 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
         COLUMN_NAMES.TIMESTAMP,
         COLUMN_NAMES.COUNT,
         COLUMN_NAMES.TOTAL)
-      .where(toTimeConditions(query.timeFilter))
-      .map(t => {
-        val (index, row) = t
+      .where(timeCondidtions(query.timeFilter))
+      .map { case (index, row) =>
         Metric(
           index.bucket,
           index.facts,
@@ -163,37 +145,33 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
           row.getInt(COLUMN_NAMES.COUNT),
           row.getLong(COLUMN_NAMES.TOTAL)
         )
-      })
+      }
   }
 
-  private def toTimeConditions(filter: TimeFilter): String = {
-    ( if (filter == TimeFilter.ALL_TIME) Seq(
-        s"${COLUMN_NAMES.TIMESTAMP} = 0"                    // timestamp = 0
-      ) else Seq(
-        s"${COLUMN_NAMES.TIMESTAMP} >= ${filter.fromTime}", // timestamp >= $fromTime
-        s"${COLUMN_NAMES.TIMESTAMP} < ${filter.toTime}"     // timestamp < $toTime
-      ) :+ s"${COLUMN_NAMES.SPAN} = ${filter.span.index}"   // span = $span.index
-    ) mkString " and "
-  }
+  private def all(conditions: String*) = conditions mkString " AND "
 
-  private def toWhereClause(bucket: String, timeFilter: TimeFilter, geoFilter: GeoFilter) = {
-    val conditions = mutable.Buffer(
-      s"${COLUMN_NAMES.BUCKET} = '$bucket'",
-      s"${COLUMN_NAMES.SPAN} = ${timeFilter.span.index}"
-    )
+  private def bucketConditions(bucket: String): String = s"${COLUMN_NAMES.BUCKET} = '$bucket'"
 
-    // FIXME: Wrong logic here
-    val geohashes = geoFilter.rect.geohashes(geoFilter.precision)
-    if (geoFilter == WORLDWIDE) {
-      conditions += s"${COLUMN_NAMES.GEOHASH} = ''"
-    } else {
-      val geohashConditions = geohashes.map(gh => s"'$gh'").mkString(", ")
-      conditions += s"${COLUMN_NAMES.GEOHASH} IN ($geohashConditions)"
-    }
+  private def timeCondidtions(filter: TimeFilter): String = all((
+    if (filter == TimeFilter.ALL_TIME)
+         Seq(s"${COLUMN_NAMES.TIMESTAMP} = 0" )                  // timestamp = 0
 
-    conditions += toTimeConditions(timeFilter)
-    conditions.mkString(" and ")
-  }
+    else Seq(s"${COLUMN_NAMES.TIMESTAMP} >= ${filter.fromTime}", // timestamp >= $fromTime
+             s"${COLUMN_NAMES.TIMESTAMP} < ${filter.toTime}")    // timestamp < $toTime
 
+          :+ s"${COLUMN_NAMES.SPAN} = ${filter.span.index}"      // span = $span.index
+  ):_*)
+
+  // FIXME: Wrong logic here
+  private def geoConditions(geoFilter: GeoFilter) =
+    if (geoFilter == WORLDWIDE) s"${COLUMN_NAMES.GEOHASH} = ''" // geohash = ""
+    else {
+      // get the geohashes of the geo rect by precision
+      val geohashes = geoFilter.rect.geohashes(geoFilter.precision)
+      val geohashList = geohashes.map(gh => s"'$gh'").mkString(", ")
+
+      s"${COLUMN_NAMES.GEOHASH} IN ($geohashList)" }            // geohash IN ('$geohashes')
+
+  // TODO: look up facts
   override def readFacts(criteria: Criteria): RDD[Map[String, String]] = ???
 }

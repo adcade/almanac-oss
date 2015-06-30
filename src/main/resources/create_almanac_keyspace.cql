@@ -15,7 +15,7 @@ CREATE TABLE metrics (
     total counter,
     count counter,
     PRIMARY KEY ((bucket, geohash), span, timestamp, factkey)
-);
+) WITH CLUSTERING ORDER BY (span DESC, timestamp DESC);
 
 DROP TABLE IF EXISTS facts;
 

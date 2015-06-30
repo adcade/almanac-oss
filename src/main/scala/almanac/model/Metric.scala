@@ -9,7 +9,7 @@ import org.joda.time.DateTime
 import org.joda.time.DateTimeZone.UTC
 import GeoHash._
 
-case class Metric(bucket: String, facts: Map[String, String]=Map.empty, span: TimeSpan, timestamp: Long, geohash: String,
+case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, timestamp: Long, geohash: String,
                   count: Int, total: Long) {
   lazy val key = Key(bucket, facts, span, timestamp, geohash)
   lazy val value = Value(count, total)

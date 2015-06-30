@@ -13,6 +13,8 @@ class MetricSuite extends FunSuite with Matchers {
     code should be (5)
     val span = TimeSpan.values(code)
     span should be (DAY)
+    val span2 = TimeSpan.lookup("DAY")
+    span2 should be (DAY)
   }
 
   test("time span strip") {

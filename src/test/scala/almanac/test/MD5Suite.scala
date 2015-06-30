@@ -1,7 +1,6 @@
 package almanac.test
 
 import almanac.util.MD5Helper._
-import almanac.util.MetricsGenerator.generateRaw
 import org.scalatest.{FunSuite, Matchers}
 
 class MD5Suite extends FunSuite with Matchers {
@@ -16,17 +15,5 @@ class MD5Suite extends FunSuite with Matchers {
     md5("") should be ("d41d8cd98f00b204e9800998ecf8427e")
     signature(Map.empty[String, String]) should be ("d41d8cd98f00b204e9800998ecf8427ed41d8cd98f00b204e9800998ecf8427e")
     signature(Map("device"-> "tablet", "os" -> "osx"))
-  }
-
-  test ("md5 bug hunting") {
-    for (_ <- 0 until 10000000) {
-      val facts = generateRaw.facts
-      print(facts)
-      println(signature(facts))
-    }
-  }
-
-  test ("device|os md5") {
-    println(md5("device|os"))
   }
 }

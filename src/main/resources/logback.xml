@@ -11,7 +11,7 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-    <root level="WARN">
+    <root level="warn">
         <appender-ref ref="ASYNC_STDOUT"/>
     </root>
 </configuration>
