@@ -141,21 +141,33 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
     read(whereClause)
   }
 
-//  def read(query: MetricsQuery): RDD[Metric] = {
-//    readFacts(query.buckets, query.geoFilter.rect.geohashes(query.geoFilter.precision))
-//      .joinWithCassandraTable(KEYSPACE, METRICS_TABLE)
-//      .select(
-//        COLUMN_NAMES.BUCKET,
-//        COLUMN_NAMES.GEOHASH,
-//        COLUMN_NAMES.SPAN,
-//        COLUMN_NAMES.TIMESTAMP,
-//        COLUMN_NAMES.COUNT,
-//        COLUMN_NAMES.TOTAL)
-//      .where(toTimeConditions(query.timeFilter))
-//  }
+  def read(query: MetricsQuery): RDD[Metric] = {
+    readFacts(query.buckets, query.geoFilter.rect.geohashes(query.geoFilter.precision))
+      .joinWithCassandraTable[CassandraRow](KEYSPACE, METRICS_TABLE)
+      .select(
+        COLUMN_NAMES.BUCKET,
+        COLUMN_NAMES.GEOHASH,
+        COLUMN_NAMES.SPAN,
+        COLUMN_NAMES.TIMESTAMP,
+        COLUMN_NAMES.COUNT,
+        COLUMN_NAMES.TOTAL)
+      .where(toTimeConditions(query.timeFilter))
+      .map(t => {
+        val (index, row) = t
+        Metric(
+          index.bucket,
+          index.facts,
+          TimeSpan.values(row.getInt(COLUMN_NAMES.SPAN)),
+          row.getLong(COLUMN_NAMES.TIMESTAMP),
+          index.geohash,
+          row.getInt(COLUMN_NAMES.COUNT),
+          row.getLong(COLUMN_NAMES.TOTAL)
+        )
+      })
+  }
 
   private def toTimeConditions(filter: TimeFilter): String = {
-    ( if (filter == ALL_TIME) Seq(
+    ( if (filter == TimeFilter.ALL_TIME) Seq(
         s"${COLUMN_NAMES.TIMESTAMP} = 0"                    // timestamp = 0
       ) else Seq(
         s"${COLUMN_NAMES.TIMESTAMP} >= ${filter.fromTime}", // timestamp >= $fromTime
