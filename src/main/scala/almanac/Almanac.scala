@@ -1,26 +1,28 @@
 package almanac
 
-import almanac.model.TimeSpan._
+import almanac.AlmanacSettings._
 import almanac.persist.CassandraMetricRDDRepository
 import almanac.spark.SparkMetricsAggregator
 import almanac.spark.SparkMetricsAggregator.AggregationSchedules
 import almanac.util.MetricsReceiver
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Almanac extends App {
-  val conf = new SparkConf().setAppName("almanac")
-    .set("spark.cassandra.connection.host", "dev")
-  val sc = new SparkContext("local[4]", "test", conf)
-  val ssc = new StreamingContext(sc, Seconds(1))
 
-//  val timeSchedules = List(SECOND, MINUTE, HOUR, DAY, ALL_TIME)
-//  val geoSchedules = List(8, 6, 4, 2, 0)
-  val schedules = AggregationSchedules(List(4, 0), List(HOUR, ALL_TIME))
+  val conf = new SparkConf(true)
+    .set("spark.cassandra.connection.host", CassandraSeed)
+    .set("spark.cleaner.ttl", SparkCleanerTtl.toString)
+    .setAppName("almanac")
+    .setMaster(SparkMaster)
+
+  val sc = new SparkContext(conf)
+  val ssc = new StreamingContext(sc, Milliseconds(SparkStreamingBatchDuration))
+
+  val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
   val metricsStream = ssc receiverStream new MetricsReceiver
-//  val aggregator = SparkMetricsAggregator(metricsStream, new MetricStreamHandler {
-//    override def handle(span: TimeSpan, precision: Int, stream: DStream[Metric]) = stream.print()
-//  }).schedule(geoSchedules, timeSchedules)
+
+  metricsStream.count().print()
   val rddRepo = new CassandraMetricRDDRepository(sc, schedules)
   SparkMetricsAggregator(metricsStream, rddRepo).schedule(schedules)
 

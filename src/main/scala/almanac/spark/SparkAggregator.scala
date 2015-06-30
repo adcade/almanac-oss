@@ -90,7 +90,7 @@ class SparkMetricsAggregator(stream: DStream[Metric], repo: MetricRDDRepository)
 }
 
 object SparkMetricsAggregator {
-  case class AggregationSchedules(geoPrecisions: Seq[Int], timeSpans: Seq[TimeSpan])
+  case class AggregationSchedules(geoPrecisions: List[Int], timeSpans: List[TimeSpan])
 
   implicit class RDDMetricsExtension(val source: RDD[Metric]) extends MetricsAggregator[RDD[Metric]]  {
     override def aggregate(func: Key => Key) =

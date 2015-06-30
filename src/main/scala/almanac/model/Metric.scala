@@ -81,4 +81,5 @@ object TimeSpan {
   case object YEAR      extends TimeSpan(_ withMonthOfYear 1)
 
   lazy val values = Seq(ALL_TIME, RAW, SECOND, MINUTE, HOUR, DAY, MONTH, YEAR)
+  lazy val lookup: Map[String, TimeSpan] = values map (s => s.toString -> s) toMap
 }
