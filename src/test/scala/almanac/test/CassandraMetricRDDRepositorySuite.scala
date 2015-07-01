@@ -72,8 +72,8 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
     val timestamp = new DateTime(2001, 9, 8, 21, 46, 40).getMillis
 
     val geohash = "dr5ru1pcr6gu"
-    val geohash1 = "dr5ru1p"
-    val geohash2 = "dr5ru1q"
+    val geohash1 = "dr5r"
+    val geohash2 = "dr57"
     val facts1 = Map("device"->"pc", "os"->"windows")
     val facts2 = Map("device"->"mobile", "os"->"osx")
 
@@ -87,17 +87,11 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
     repo save rdd
     repo saveFacts rdd
 
-    println("saved")
-
-    println(new DateTime(HOUR(timestamp)), new DateTime(HOUR(timestamp) + 3600000))
-
     val query = select("impression", "exit")
-            .locate(7, GeoRect("dr5ru1"))
+            .locate(7, GeoRect("dr5"))
             .time(HOUR, HOUR(timestamp) - 36000000, HOUR(timestamp) + 36000000)
             .query
 
-    repo read query foreach println
-
-    println("read")
+    (repo read query).collect().map(_.key).toSet should be (metrics.map(_.key).toSet)
   }
 }
