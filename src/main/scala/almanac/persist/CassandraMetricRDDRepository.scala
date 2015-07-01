@@ -46,7 +46,7 @@ object CassandraMetricRDDRepository {
   val metricToTuple = (m: Metric) => (
     m.bucket,
     m.geohash,
-    signature(m.facts),
+    hash(m.facts),
     m.span.index,
     m.timestamp,
     m.count,
@@ -73,7 +73,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
   override def saveFacts(rdd: RDD[Metric]) = rdd
       .aggregateByTimeSpan(ALL_TIME.span)
       .distinct()
-      .map { mkey => FactIndex(mkey.bucket, mkey.geohash, signature(mkey.facts), mkey.facts) }
+      .map { mkey => FactIndex(mkey.bucket, mkey.geohash, hash(mkey.facts), mkey.facts) }
       .saveToCassandra(KEYSPACE, FACTS_TABLE)
 
   override def saveFacts(stream: DStream[Metric]) = stream foreachRDD ( saveFacts(_) )
@@ -167,7 +167,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
     if (geoFilter == WORLDWIDE) s"${COLUMN_NAMES.GEOHASH} = ''" // geohash = ""
     else {
       // get the geohashes of the geo rect by precision
-      val geohashes = geoFilter.rect.geohashes(geoFilter.precision)
+      val geohashes = geoFilter.rect.geohashes(schedules.geoPrecisions.toSet)
       val geohashList = geohashes.map(gh => s"'$gh'").mkString(", ")
 
       s"${COLUMN_NAMES.GEOHASH} IN ($geohashList)" }            // geohash IN ('$geohashes')

@@ -7,13 +7,12 @@ class MD5Suite extends FunSuite with Matchers {
   val m = Map("snow" -> "ski", "wave" -> "surf", "mountain" -> "hike")
 
   test ("md5helper should make map a string") {
-    mapToTuple(m) should be ("mountain|snow|wave","hike|ski|surf")
+    mapToString(m) should be ("mountain:hike|snow:ski|wave:surf")
   }
 
   test ("md5helper should translate map to md5 string") {
-    signature(m) should be ("6b30c58ee96a0f93e7c887d6b8baa0652a748cd40611b4a3a76521c21563742b")
+    hash(m) should be ("6afe265d8db21603683c6f6aa91f8fd0")
     md5("") should be ("d41d8cd98f00b204e9800998ecf8427e")
-    signature(Map.empty[String, String]) should be ("d41d8cd98f00b204e9800998ecf8427ed41d8cd98f00b204e9800998ecf8427e")
-    signature(Map("device"-> "tablet", "os" -> "osx"))
+    hash(Map.empty[String, String]) should be ("d41d8cd98f00b204e9800998ecf8427e")
   }
 }

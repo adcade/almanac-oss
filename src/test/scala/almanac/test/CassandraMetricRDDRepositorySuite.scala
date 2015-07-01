@@ -49,9 +49,9 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
     repo.saveFacts(rdd)
 
     val distinctBuckets = metrics.map(_.bucket).toSet
-    val distinctGeohashes = GeoRect(latRange, lngRange).geohashes(4)
+    val distinctGeohashes = GeoRect(latRange, lngRange).geohashes(Set(4))
 
-    repo.readFacts(distinctBuckets, distinctGeohashes).collect().foreach(println)
+    repo.readFacts(distinctBuckets, GeoFilter(4, GeoRect(latRange, lngRange))).collect().foreach(println)
   }
 
   test("test facts rdd") {
@@ -63,7 +63,7 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
 
     val distinctBuckets = metrics.map(_.bucket).toSet
 
-    repo.readFacts(distinctBuckets, Set("")).collect().foreach(println)
+    repo.readFacts(distinctBuckets, GeoFilter.WORLDWIDE).collect().foreach(println)
   }
 
   test("test metrics query") {

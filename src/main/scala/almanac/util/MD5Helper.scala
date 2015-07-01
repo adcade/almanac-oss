@@ -4,20 +4,13 @@ import java.security.MessageDigest
 
 object MD5Helper {
 
-  def md5(source: String): String = {
-    MessageDigest.getInstance("MD5")
+  def md5(source: String): String = MessageDigest.getInstance("MD5")
       .digest(source.getBytes)
       .map("%02x".format(_))
       .mkString
-  }
 
-  def signature(map: Map[String, String]): String = {
-    val (keyStr, valueStr) = mapToTuple(map)
-    md5(keyStr)+md5(valueStr)
-  }
+  def hash(map: Map[String, String]): String = md5(mapToString(map))
 
-  def mapToTuple(map: Map[String, String]): (String, String) = {
-    val (keys, values) = map.toList.sorted.unzip
-    (keys.mkString("|"), values.mkString("|"))
-  }
+  def mapToString(map: Map[String, String]): String =
+    map.toList.sorted map { case (key, value) => s"$key:$value" } mkString "|"
 }
