@@ -1,11 +1,18 @@
 package almanac.model
 
 import java.util.Date
+import almanac.model.GeoHash._
 
 object TimeFilter {
   val ALL_TIME: TimeFilter = new TimeFilter(TimeSpan.ALL_TIME, 0, 0)
 }
 
+/**
+ *
+ * @param span
+ * @param fromTime
+ * @param toTime
+ */
 case class TimeFilter(span: TimeSpan, fromTime: Long, toTime: Long) {
   override def toString: String =
     if (this == TimeFilter.ALL_TIME) "ALL TIME"
@@ -13,17 +20,22 @@ case class TimeFilter(span: TimeSpan, fromTime: Long, toTime: Long) {
 }
 
 object GeoFilter {
-  val WORLDWIDE: GeoFilter = new GeoFilter(0, GeoRect(0, 0, 0, 0))
+  val WORLDWIDE: GeoFilter = new GeoFilter(GeoRect(LAT_RANGE, LNG_RANGE), GeoHash.WORLDWIDE)
 
-  def apply(geohash: String): GeoFilter = {
-    GeoFilter(geohash.length, GeoRect(geohash))
+  def apply(geohash: String, maxPrecision: Int = MAX_PRECISION): GeoFilter = {
+    GeoFilter(GeoRect(geohash), maxPrecision)
   }
 }
 
-case class GeoFilter(precision: Int, rect: GeoRect) {
+/**
+ *
+ * @param rect
+ * @param maxPrecision
+ */
+case class GeoFilter(rect: GeoRect, maxPrecision: Int) {
   override def toString: String =
     if (this == GeoFilter.WORLDWIDE) "WORLDWIDE"
-    else "%s\n  rect %s" format (precision, rect)
+    else "rect %s max %s" format (rect, maxPrecision)
 }
 
 object Order extends Enumeration {
@@ -31,10 +43,24 @@ object Order extends Enumeration {
   val ASC, DESC = Value
 }
 
+/**
+ *
+ * @param fact
+ * @param dir
+ */
 case class Order private[model] (fact: String, dir: Order.Direction) {
   override def toString: String = fact + " " + dir
 }
 
+/**
+ *
+ * @param buckets
+ * @param criteria
+ * @param groupNames
+ * @param orders
+ * @param geoFilter
+ * @param timeFilter
+ */
 case class MetricsQuery (
   buckets: Set[String],
   criteria: Criteria,
@@ -43,6 +69,14 @@ case class MetricsQuery (
   geoFilter: GeoFilter,
   timeFilter: TimeFilter) {
 
+  /**
+   * unwounded queries with each buckets for caching purpose
+   *
+   * TODO: make geoFilter also a part of the unwind process
+   *
+   * @return
+   */
+  // TODO: need to work on geoFilter
   def unwoundQueries = buckets map (b => MetricsQuery(Set(b), criteria, groupNames, orders, geoFilter, timeFilter))
 
   override def toString: String = {
@@ -73,20 +107,94 @@ object MetricsQuery {
     limit: Int,
     skip: Int) {
 
+    /**
+     *
+     * @param criteria
+     * @return
+     */
     def where(criteria: Criteria) = Builder(buckets, criteria, groupNames, orders, geoFilter, timeFilter, limit, skip)
+
+    /**
+     *
+     * @param facts
+     * @return
+     */
     def groupBy(facts: String*) = Builder(buckets, criteria, groupNames ++ facts, orders, geoFilter, timeFilter, limit, skip)
+
+    /**
+     *
+     * @param orders
+     * @return
+     */
     def orderBy(orders: Order*) = Builder(buckets, criteria, groupNames, this.orders ++ orders, geoFilter, timeFilter, limit, skip)
+
+    /**
+     *
+     * @param fact
+     * @param dir
+     * @return
+     */
     def orderBy(fact: String, dir: Order.Direction): Builder = orderBy(Order(fact, dir))
+
+    /**
+     *
+     * @param filter
+     * @return
+     */
     def time(filter: TimeFilter) = Builder(buckets, criteria, groupNames, orders, geoFilter, filter, limit, skip)
+
+    /**
+     *
+     * @param span
+     * @param fromTime
+     * @param toTime
+     * @return
+     */
     def time(span: TimeSpan, fromTime: Long, toTime: Long): Builder = time(TimeFilter(span, fromTime, toTime))
+
+    /**
+     *
+     * @param filter
+     * @return
+     */
     def locate(filter: GeoFilter): Builder = Builder(buckets, criteria, groupNames, orders, filter, timeFilter, limit, skip)
+
+    /**
+     *
+     * @param geohash
+     * @return
+     */
     def locate(geohash: String): Builder = locate(GeoFilter(geohash))
-    def locate(precision: Int, rect: GeoRect): Builder = locate(GeoFilter(precision, rect))
+
+    /**
+     *
+     * @param rect
+     * @param maxPrecision
+     * @return
+     */
+    def locate(rect: GeoRect, maxPrecision: Int = MAX_PRECISION): Builder = locate(GeoFilter(rect, maxPrecision))
+
+    /**
+     *
+     * @param limit
+     * @return
+     */
     def limit(limit: Int): Builder = Builder(buckets, criteria, groupNames, orders, geoFilter, timeFilter, limit, skip)
+
+    /**
+     *
+     * @param skip
+     * @return
+     */
     def skip(skip: Int) = Builder(buckets, criteria, groupNames, orders, geoFilter, timeFilter, limit, skip)
 
     lazy val query = MetricsQuery(buckets, criteria, groupNames, orders, geoFilter, timeFilter)
   }
 
+  /**
+   *
+   * @param buckets
+   * @return
+   */
   def select(buckets: String*) = Builder(Set(buckets: _*), NonCriteria, Seq(), Seq(), GeoFilter.WORLDWIDE, TimeFilter.ALL_TIME, NO_LIMIT, 0)
 }

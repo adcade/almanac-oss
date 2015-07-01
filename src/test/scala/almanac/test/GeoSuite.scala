@@ -51,6 +51,24 @@ class GeoSuite extends FunSuite with Matchers {
     co.lng should be (-73.992947 +- 0.00001)
   }
 
+  test ("geohash padding") {
+    println(GeoHash.encode(40.75927734375, -73.98193359375))
+    println(40.75927734376 x -73.98193359376 geohash)
+    println(Coordinate("dr5ru"))
+    println(Coordinate("dr5rus000000"))
+    println(Coordinate("dr5rukppbpbpb"))
+    println(Coordinate("dr5ru").geohash)
+    val co = Coordinate("dr5ru" ~ 8)
+    co.lat should be (40.75927734375 +- 0.00001)
+    co.lng should be (-73.98193359375 +- 0.00001)
+    val co2 = Coordinate("dr5ru" ~ 12)
+    co2.lat should be (40.75927734375 +- 0.00001)
+    co2.lng should be (-73.98193359375 +- 0.00001)
+
+//    dr72h56v5p28
+//    dr5ru
+  }
+
   test("longitude -45 westOf 45 westOf 135 westOf -135 westOf -45") {
     /*
     -135 180 135
@@ -95,8 +113,7 @@ class GeoSuite extends FunSuite with Matchers {
     subGeohashes("gehs", Set(2, 0)) should be (Nil)
     subGeohashes("", Set(2)).toSet should be ((for (i <- BASE32; j <- BASE32) yield s"$i$j") toSet)
   }
-
-  test ("geohashes test") {
+  test ("rectangle geohashes test") {
     GeoRect("c4").geohashes(Set.empty[Int]) should be (Set())
     GeoRect("c4").geohashes(Set(0)) should be (Set(""))
     GeoRect("gehs").geohashes(Set(7, 5, 2, 0)) should be ((for (i <- BASE32) yield s"gehs$i") toSet)

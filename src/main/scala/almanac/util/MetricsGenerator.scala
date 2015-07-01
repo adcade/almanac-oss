@@ -18,7 +18,7 @@ object MetricsGenerator {
   val os = Seq("ios", "windows", "android", "osx", "linux")
   val buckets = Seq("std.imp.richmedia", "std.imp.backup", "std.exit")
   val latRange = (40.799, 40.8)
-  val lngRange = (73.999, 74.0)
+  val lngRange = (-73.999, -74.0)
 
   val ran = new Random
   def random(b: Bounds) = ran.nextDouble * (b._2 - b._1) + b._1

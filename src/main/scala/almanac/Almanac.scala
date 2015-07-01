@@ -27,5 +27,9 @@ object Almanac extends App {
   SparkMetricsAggregator(metricsStream, rddRepo).schedule(schedules)
 
   ssc.start()
+
+//  val system = ActorSystem("almanac", rootConfig)
+//  system.actorOf()
+
   ssc.awaitTermination()
 }

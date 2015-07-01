@@ -16,9 +16,9 @@ object AlmanacSettings {
 
   val SparkStreamingBatchDuration: Long = config.getLong("spark.streaming.batch.duration")
 
-  val TimeSchedules = immutableSeq(config.getStringList("aggregation.schedule.time")) map TimeSpan.lookup toList
+  val TimeSchedules = immutableSeq(config.getStringList("aggregation.schedule.time")) map (TimeSpan(_)) toList
 
-  val GeoSchedules = immutableSeq(config.getIntList("aggregation.schedule.geo")) map (_.intValue) toList
+  val GeoSchedules = immutableSeq(config.getIntList("aggregation.schedule.geo")) map(_.intValue) toList
 
   val CassandraSeed: String = config.getString("cassandra.connection.host")
 

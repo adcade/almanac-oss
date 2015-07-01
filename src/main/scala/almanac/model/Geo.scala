@@ -1,6 +1,6 @@
 package almanac.model
 
-import almanac.model.Coordinate._
+//import almanac.model.Coordinate._
 import almanac.model.GeoHash._
 
 object GeoHash {
@@ -12,16 +12,16 @@ object GeoHash {
   val WORLDWIDE = 0
   val MAX_PRECISION = 12
 
-  lazy val ALL_PRECISION = (0 to 12) toSet
+  lazy val ALL_PRECISION = (WORLDWIDE to MAX_PRECISION) toSet
 
   implicit class CoordinateWrapper(x: Double) {
     def in(b: Bounds): Boolean = x >= b._1 && x <= b._2
     def westOf(otherLng: Double): Boolean = if (x < otherLng) x + 180 > otherLng
                                             else if (x > 0 && otherLng <0) otherLng + 180 < x
                                             else false
-    def eastOf(otherLng: Double): Boolean = !westOf(otherLng)
+    def eastOf(otherLng: Double): Boolean = !westOf(otherLng) && x!=otherLng
     def northOf(otherLat: Double): Boolean = otherLat < x
-    def southOf(otherLat: Double): Boolean = !northOf(otherLat)
+    def southOf(otherLat: Double): Boolean = !northOf(otherLat) && x!=otherLat
   }
 
   val BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
@@ -52,6 +52,11 @@ object GeoHash {
     else if (geohash.isEmpty) None // you can't have super geohash of empty String
     else superGeohash(geohash.substring(0, geohash.length - 1), precisions)
 
+  /**
+   *
+   * @param geohash
+   * @return
+   */
   def toBounds(geohash: String): (Bounds, Bounds) = {
     def charToInt(ch: Char) = BASE32.indexOf(ch)
     def intToBits(i: Int) = (4 to 0 by -1) map (i >> _ & 1) map (1==)
@@ -66,6 +71,11 @@ object GeoHash {
     (fromBits(latBits, LAT_RANGE), fromBits(lngBits, LNG_RANGE))
   }
 
+  /**
+   *
+   * @param geohash
+   * @return
+   */
   def decode(geohash: String): (Double, Double) = {
     toBounds(geohash) match {
       case ((minLat, maxLat), (minLng, maxLng)) => ( (maxLat+minLat)/2, (maxLng+minLng)/2 )
@@ -89,24 +99,47 @@ object GeoHash {
     }
   }
 
-  def encode(lat: Double, lng: Double, precision: Int = 12) = {
+  /**
+   *
+   * @param lat
+   * @param lng
+   * @param precision
+   * @return
+   */
+  def encode(lat: Double, lng: Double, precision: Int = MAX_PRECISION) = {
     require(lat in LAT_RANGE, "Latitude out of range")
     require(lng in LNG_RANGE, "Longitude out of range")
     require(precision >= 0, "Precision must be a positive integer")
     val numBits = precision * 5 / 2
     val latBits = toBits(lat, LAT_RANGE, numBits)
     val lngBits = toBits(lng, LNG_RANGE, numBits + precision % 2)
-    interleave(lngBits, latBits).grouped(5).map { x =>
+    interleave(lngBits, latBits) grouped(5) map { x =>
       BASE32(x reduceLeft { (acc, b) => (acc << 1) + b})
-    }.mkString
+    } mkString
   }
 
   implicit class GeoHashHelper(geohash: String) {
-    def round(precision: Int): String = {
+
+    /**
+     *
+     * @param precision
+     * @return
+     */
+    def roundOrPad(precision: Int): String = {
       require(precision >= 0)
-      if (precision <= geohash.length) geohash.substring(0, precision) else geohash
+      val delta = precision - geohash.length
+      val sb = new StringBuilder(geohash)
+      if (delta <= 0) sb.substring(0, precision)
+      else ((sb append "s") /: (1 until delta)) { (sb, _) => sb append "0" } toString
     }
-    def ~(precision: Int) = round(precision)
+
+    /**
+     * convenient method for <link>roundOrPad</link>
+     *
+     * @param precision
+     * @return
+     */
+    def ~(precision: Int) = roundOrPad(precision)
   }
 }
 
@@ -154,7 +187,7 @@ object GeoRect {
 
   def apply(latBounds: Bounds, lngBounds: Bounds): GeoRect = {
     val ((minLat, maxLat), (minLng, maxLng)) = (latBounds, lngBounds)
-    GeoRect(maxLat x maxLng, minLat x minLng)
+    GeoRect(maxLat, maxLng, minLat, minLng)
   }
 
   /**
@@ -189,6 +222,42 @@ trait Shape {
   def contains(co: Coordinate): Boolean
   def contains(other: GeoRect): Boolean
   def contains(geohash: String): Boolean
+
+  /**
+   * return geohashes of this GeoRect on only given precision level
+   *
+   * Example:
+   * if pass in Set(0, 2, 4, 6)
+   *
+   * returns geohashes 0
+   *
+   * @param precisions a set of precisions the geohashes should ranged in
+   * @return a set of geohashes
+   */
+  def geohashes(precisions: Set[Int] = ALL_PRECISION): Set[String] = {
+    def next(gh: String): Seq[String] = {
+      if (gh.length >= precisions.max) Seq(superGeohash(gh, precisions)).flatten
+      else if (this contains gh) subGeohashes(gh, precisions)
+      else level(gh, GeoRect(gh), 1, 0) flatMap next
+    }
+
+    def level(prefix:String, rect: GeoRect, bitmap: Int, even: Int): Seq[String] = {
+      if (bitmap >= 32) Seq(prefix + BASE32(bitmap - 32))
+      else Seq(0, 1) flatMap (bit => {
+        val halfRect =
+          if ((prefix.length * 5 + even) % 2 == 0) // split vertically?
+            if (bit == 0) rect.leftChild   else rect.rightChild // west part or east part
+          else
+          if (bit == 0) rect.bottomChild else rect.topChild   // south part or north part
+
+        if (!intersects(halfRect)) Nil
+        else level(prefix, halfRect, (bitmap << 1) + bit, even ^ 1)
+      })
+    }
+
+    if (precisions.isEmpty) Set.empty[String]
+    else next("") toSet
+  }
 }
 
 case class GeoRect(north: Double, east: Double, south: Double, west: Double) extends Shape {
@@ -217,6 +286,14 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
   def latSpan = (south, north)
   def lngSpan = (math.min(east, west), math.max(east, west))
 
+  /**
+   *
+   * @param bottom1
+   * @param top1
+   * @param bottom2
+   * @param top2
+   * @return
+   */
   private def latIntersect(bottom1: Double, top1: Double, bottom2: Double, top2: Double): Boolean =
     (bottom1 <= bottom2 && bottom2 <  top1) ||
     (bottom1 <  top2    && top2    <= top1) ||
@@ -251,63 +328,70 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
       (left2 <  right1 && right1 <= 180) || (-180 <= right1 && right1 <= right2)    // r1 E [l2, IDL] U [IDL, r2)
     )
 
+  /**
+   *
+   * @param bottom1
+   * @param top1
+   * @param bottom2
+   * @param top2
+   * @return
+   */
   private def latContains(bottom1: Double, top1: Double, bottom2: Double, top2: Double): Boolean =
     bottom1 <= bottom2 && bottom2 < top1 && bottom1 < top2 && top2 <= top1 // b2 E [b1, t1) && t2 E (b1, t1]
 
+  /**
+   *
+   * @param left1
+   * @param right1
+   * @param left2
+   * @param right2
+   * @return
+   */
   private def lngContains(left1: Double, right1: Double, left2: Double, right2: Double): Boolean =
     if (left1 <= right1) left1 <= left2 && left2 <= right2 && right2 <= right1            // [l1 -> l2 -> r2 -> r1]
     else (left1 <= left2  && left2  <= right2 && right2 <= 180    && -180   <  right1) || // [l1 -> l2 -> r2 -> IDL -> r1]
          (left1 <= left2  && left2  <= 180    && -180   <= right2 && right2 <= right1) || // [l1 -> l2 -> IDL -> r2 -> r1]
          (left1 <  180    && -180   <= left2  && left2  <= right2 && right2 <= right1)    // [l1 -> IDL -> l2 -> r2 -> r1]
 
+  /**
+   *
+   * @param other
+   * @return
+   */
   def intersects(other: GeoRect): Boolean =
     latIntersect(south, north, other.south, other.north) &&
     lngIntersect(west, east, other.west, other.east)
 
+  /**
+   *
+   * @param geohash
+   * @return
+   */
   def intersects(geohash: String): Boolean = intersects(GeoRect(geohash))
+
+  /**
+   *
+   * @param co
+   * @return
+   */
   def contains(co: Coordinate): Boolean = ((co.lng eastOf west) || (co.lng == west)) &&
                                           ((co.lng westOf east) || (co.lng == east)) &&
                                           ((co.lat southOf north) || (co.lat == north)) &&
                                           ((co.lat northOf south) || (co.lat == south))
+
+  /**
+   *
+   * @param other
+   * @return
+   */
   def contains(other: GeoRect): Boolean =
     latContains(south, north, other.south, other.north) &&
     lngContains(west, east, other.west, other.east)
 
-  def contains(geohash: String): Boolean = contains(GeoRect(geohash))
-
   /**
-   * return geohashes of this GeoRect on only given precision level
    *
-   * Example:
-   * if pass in Set(0, 2, 4, 6)
-   *
-   * returns geohashes 0
-   *
-   * @param precisions a set of precisions the geohashes should ranged in
-   * @return a set of geohashes
+   * @param geohash
+   * @return
    */
-  def geohashes(precisions: Set[Int] = ALL_PRECISION): Set[String] = {
-    def next(gh: String): Seq[String] = {
-      if (gh.length >= precisions.max) Seq(superGeohash(gh, precisions)).flatten
-      else if (this contains gh) subGeohashes(gh, precisions)
-      else level(gh, GeoRect(gh), 1, 0) flatMap next
-    }
-
-    def level(prefix:String, rect: GeoRect, bitmap: Int, even: Int): Seq[String] = {
-      if (bitmap >= 32) Seq(prefix + BASE32(bitmap - 32))
-      else Seq(0, 1) flatMap (bit => {
-        val halfRect =
-          if ((prefix.length * 5 + even) % 2 == 0) // split vertically?
-            if (bit == 0) rect.leftChild   else rect.rightChild // west part or east part
-          else
-            if (bit == 0) rect.bottomChild else rect.topChild   // south part or north part
-
-        if (!intersects(halfRect)) Nil
-        else level(prefix, halfRect, (bitmap << 1) + bit, even ^ 1)
-      })
-    }
-
-    if (precisions.isEmpty) Set.empty[String]
-    else next("") toSet
-  }
+  def contains(geohash: String): Boolean = contains(GeoRect(geohash))
 }

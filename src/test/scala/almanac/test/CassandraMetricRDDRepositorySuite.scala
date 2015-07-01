@@ -1,10 +1,13 @@
 package almanac.test
 
+import almanac.model.GeoHash._
 import almanac.model.MetricsQuery._
 import almanac.model.TimeSpan._
 import almanac.model._
 import almanac.persist.CassandraMetricRDDRepository
+import almanac.persist.CassandraMetricRDDRepository.FactIndex
 import almanac.spark.SparkMetricsAggregator._
+import almanac.util.MD5Helper._
 import almanac.util.MetricsGenerator._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
@@ -21,6 +24,24 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
   val sc = new SparkContext("local[4]", "test", conf)
   val ssc = new StreamingContext(sc, Milliseconds(100))
   val schedules = AggregationSchedules(List(4), List(HOUR))
+
+  // region test data
+  val timestamp = new DateTime(2001, 9, 8, 21, 46, 40).getMillis
+
+  val geohash = "dr5ru1pcr6gu"
+  val geohash1 = "dr5r"
+  val geohash2 = "dr57"
+  val facts1 = Map("device"->"pc", "os"->"windows")
+  val facts2 = Map("device"->"mobile", "os"->"osx")
+
+  val metrics = Seq(
+    Metric("std.impression", facts1, HOUR, timestamp, geohash1, 62, 824),
+    Metric("std.impression", facts2, HOUR, timestamp, geohash2, 62, 824),
+    Metric("std.exit", facts1, HOUR, timestamp, geohash2, 62, 824),
+    Metric("std.exit", facts2, HOUR, timestamp, geohash1, 62, 824)
+  )
+  val metricsRdd = sc.parallelize(metrics)
+  // endregion
 
   test("test metrics dstream save") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
@@ -43,55 +64,47 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
 
   test("test facts with geo rdd") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
-    val metrics = (1 to 10) map (_ => generateRawWithGeo)
-    val rdd = sc.makeRDD(metrics).aggregateByGeoPrecision(4)
 
-    repo.saveFacts(rdd)
+    repo saveFacts metricsRdd
 
-    val distinctBuckets = metrics.map(_.bucket).toSet
-    val distinctGeohashes = GeoRect(latRange, lngRange).geohashes(Set(4))
+    val result = repo readFacts (Set("std.impression", "std.exit"), GeoFilter(geohash1 ~ 3, 4)) collect()
 
-    repo.readFacts(distinctBuckets, GeoFilter(4, GeoRect(latRange, lngRange))).collect().foreach(println)
+    result should contain theSameElementsAs(Set(
+      FactIndex("std.impression", geohash1, hash(facts1), facts1),
+      FactIndex("std.impression", geohash2, hash(facts2), facts2),
+      FactIndex("std.exit",       geohash2, hash(facts1), facts1),
+      FactIndex("std.exit",       geohash1, hash(facts2), facts2)
+    ))
   }
 
   test("test facts rdd") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
-    val metrics = (1 to 10) map (_ => generateRawWithFacts)
-    val rdd = sc.makeRDD(metrics).aggregateByGeoPrecision(4)
 
-    repo.saveFacts(rdd)
+    repo saveFacts metricsRdd
 
-    val distinctBuckets = metrics.map(_.bucket).toSet
-
-    repo.readFacts(distinctBuckets, GeoFilter.WORLDWIDE).collect().foreach(println)
+    repo readFacts (Set("std.impression", "std.exit")) collect() foreach println
   }
 
   test("test metrics query") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
 
-    val timestamp = new DateTime(2001, 9, 8, 21, 46, 40).getMillis
+    repo save metricsRdd
+    repo saveFacts metricsRdd
 
-    val geohash = "dr5ru1pcr6gu"
-    val geohash1 = "dr5r"
-    val geohash2 = "dr57"
-    val facts1 = Map("device"->"pc", "os"->"windows")
-    val facts2 = Map("device"->"mobile", "os"->"osx")
-
-    val metrics = Seq(
-      Metric("impression", facts1, HOUR, timestamp, geohash1, 62, 824),
-      Metric("impression", facts2, HOUR, timestamp, geohash2, 62, 824),
-      Metric("exit", facts1, HOUR, timestamp, geohash2, 62, 824),
-      Metric("exit", facts2, HOUR, timestamp, geohash1, 62, 824)
-    )
-    val rdd = sc.parallelize(metrics)
-    repo save rdd
-    repo saveFacts rdd
-
-    val query = select("impression", "exit")
-            .locate(7, GeoRect("dr5"))
-            .time(HOUR, HOUR(timestamp) - 36000000, HOUR(timestamp) + 36000000)
+//    val startTime = System.currentTimeMillis
+    val query = select("std.impression")
+            .locate(GeoRect("dr5"), 7)
+            .time(HOUR, HOUR(timestamp), HOUR(timestamp) + 3600000)
             .query
 
-    (repo read query).collect().map(_.key).toSet should be (metrics.map(_.key).toSet)
+    val result = (repo read query) collect()
+
+//    val duration = System.currentTimeMillis - startTime
+//    duration should be <= (200L)
+
+//    result.map(_.key) should contain theSameElementsAs(
+//      metrics.map(_.key).filter(_.bucket == "std.impression"))
+
+    result foreach println
   }
 }
