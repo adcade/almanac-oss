@@ -29,10 +29,6 @@ class GeoSuite extends FunSuite with Matchers {
     val ((lat1,lng1), (lat2, lng2)) = toBounds(geohash)
     GeoRect(geohash ~ 0) should be (GeoRect(90, 180, -90, -180))
     (12 to 0 by -1) foreach {x => println( (x, GeoRect(geohash ~ x)) )}
-//    lat1 should be ( 40.743028 +- 0.00001)
-//    lng1 should be (-73.992947 +- 0.00001)
-//    lat2 should be ( 40.743028 +- 0.00001)
-//    lng2 should be (-73.992947 +- 0.00001)
   }
 
   test("geohash round to any precision") {
@@ -87,60 +83,6 @@ class GeoSuite extends FunSuite with Matchers {
     assert (   GeoRect(10, -170, -10, 170)      intersects GeoRect(5, -160, -5, 160)       )
     assert (   GeoRect(10, -170, -10, 170)      intersects GeoRect(5, 180, -5, 160)        )
   }
-
-//  test("get geohashes of a GeoRect") {
-//    val rect1 = GeoRect("dr5ru1pcr6gu")
-//    rect1.geohashesToPricision(12) should be (Set("dr5ru1pcr6gu"))
-//
-//    val rect2 = GeoRect("dr5ru")
-//    rect2.geohashesToPricision(12) should be (Set("dr5ru"))
-//
-//    val rect3 = GeoRect(10.001, 10.001, 10, 10)
-//    rect3.geohashesToPricision(8) should be (Set("s1z0gsd1", "s1z0gsd7", "s1z0gsd2", "s1z0gs6p", "s1z0gsd6",
-//                                      "s1z0gsd3", "s1z0gsd5", "s1z0gsd4", "s1z0gs6r", "s1z0gsd0"))
-//
-//    rect3.geohashesToPricision(7, inner=true) should be (Set())
-//    rect3.geohashesToPricision(7, inner=false) should be (Set("s1z0gs3", "s1z0gs6", "s1z0gs9", "s1z0gsd"))
-//  }
-//
-//  test ("geohash experiment") {
-//    val geohash = "dr5ru1pcr6gu"
-//
-//    for (p <- 0 to 8) {
-//      val rect = GeoRect(geohash.substring(0, p))
-//      println(geohash.substring(0, p), (rect.top - rect.bottom) * (rect.left - rect.right))
-//    }
-//
-//    for {pLat <- 0 to 5
-//         pLng <- 0 to 5
-//         pGeohash <- 1 to 8
-//    } {
-//      val dLat = 1 * math.pow(0.1, pLat)
-//      val dLng = 1 * math.pow(0.1, pLng)
-//      val rect = GeoRect(dLat, dLng, 0, 0)
-//      val pLog = math.log10(dLat * dLng)
-//      val geohashes = rect.geohashesToPricision(pGeohash)
-//      if (geohashes.size > 0 && geohashes.size < 100)
-//        println(pLat, pLng, -math.round(pLog), pGeohash, geohashes.size)
-//    }
-//  }
-//
-//  test ("geohash experiment2") {
-//    val ran = new Random
-//    def random(b: Bounds) = ran.nextDouble * (b._2 - b._1) + b._1
-//    var max = 0
-//    for (i <- 0 to 10000) {
-//      val rect = GeoRect(random(LAT_RANGE) x random(LNG_RANGE), random(LAT_RANGE) x random(LNG_RANGE))
-////      val geohashes = rect.geohashesWithLimit(100)
-//      val geohashes = rect.geohashesWithLowestPrecision()
-//      if (geohashes.size > 1) {
-//        if (geohashes.size > max) max = geohashes.size
-//        println(geohashes.size, geohashes)
-//      }
-//    }
-//
-//    println(max)
-//  }
 
   test ("super-geohash and sub-geohashes") {
     superGeohash("gehs") should be (Some("gehs"))

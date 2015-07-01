@@ -12,7 +12,7 @@ object GeoHash {
   val WORLDWIDE = 0
   val MAX_PRECISION = 12
 
-  lazy val ALL_PRECISION = (0 to 10) toSet
+  lazy val ALL_PRECISION = (0 to 12) toSet
 
   implicit class CoordinateWrapper(x: Double) {
     def in(b: Bounds): Boolean = x >= b._1 && x <= b._2
@@ -287,7 +287,6 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
    * @return a set of geohashes
    */
   def geohashes(precisions: Set[Int] = ALL_PRECISION): Set[String] = {
-
     def next(gh: String): Seq[String] = {
       if (gh.length >= precisions.max) Seq(superGeohash(gh, precisions)).flatten
       else if (this contains gh) subGeohashes(gh, precisions)
@@ -311,41 +310,4 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
     if (precisions.isEmpty) Set.empty[String]
     else next("") toSet
   }
-
-  def geohashesToPricision(precision: Int, inner: Boolean = false): Set[String] = {
-    def _geohashes(prefix: String): Seq[String] = {
-      if (prefix.length >= precision)
-        if (inner) Nil else Seq(prefix)
-      else
-        BASE32 map (prefix + _) flatMap { gh =>
-          if (this contains gh) Seq(gh)
-          else if (this intersects gh) _geohashes(gh)
-          else Nil
-        }
-    }
-    _geohashes("").toSet
-  }
-
-  def geohashesWithLimit(limit: Int, inner: Boolean = false): Set[String] = {
-    ((Set.empty[String], true) /: (1 to 12)) { case ((ghs, continue), p) =>
-      if (continue) {
-        val newResult = geohashesToPricision(p, inner)
-        if (newResult.size > limit) (ghs, false)
-        else (newResult, true)
-      } else {
-        (ghs, continue)
-      }
-    }._1
-  }
-
-  def geohashesWithLowestPrecision(inner: Boolean = false): Set[String] = {
-    var result = Set.empty[String]
-    var precision = 0
-    do {
-      precision += 1
-      result = geohashesToPricision(precision, inner)
-    } while (result.isEmpty)
-    result
-  }
-
 }
