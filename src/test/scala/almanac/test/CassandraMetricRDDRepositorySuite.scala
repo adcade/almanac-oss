@@ -81,7 +81,6 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
 
   test("test metrics query") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
-
     repo save metricsRdd
     repo saveKeys metricsRdd.map(_.key)
 
@@ -94,16 +93,21 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
 
     val result = (repo read query) collect()
 
-    System.currentTimeMillis - startTime should be <= 300L
+    val duration = System.currentTimeMillis - startTime
+    duration should be <= 300L
+    println(duration)
 
     result map(_.key) should contain theSameElementsAs (metrics map (_.key) filter (_.bucket=="std.impression"))
   }
 
   test("test metrics query of no fact metrics") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
-
     repo save metricsRdd
     repo saveKeys metricsRdd.map(_.key)
+
+    val expected = metrics map (_.key) filter (_.bucket=="std.impression") map {k =>
+      Metric.Key(k.bucket, Map(), k.span, k.timestamp, k.geohash)
+    } toSet
 
     val startTime = System.currentTimeMillis
 
@@ -112,14 +116,11 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
       .locate(GeoRect("dr5"), 7)
       .time(HOUR, HOUR(timestamp), HOUR(timestamp) + 3600000)
       .query
-
     val result = (repo read query) collect()
 
-    System.currentTimeMillis - startTime should be <= 500L
-
-    val expected = metrics map (_.key) filter (_.bucket=="std.impression") map {k =>
-      Metric.Key(k.bucket, Map(), k.span, k.timestamp, k.geohash)
-    } toSet
+    val duration = System.currentTimeMillis - startTime
+    duration should be <= 500L
+    println(duration)
 
     // FIXME: the result seems to be wrong! we didn't save any no fact metrics!!!
     // TODO: this is even slower than the join version

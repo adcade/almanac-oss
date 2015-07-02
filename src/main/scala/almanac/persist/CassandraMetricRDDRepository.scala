@@ -108,24 +108,23 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
   override def save(precision: Int, span: TimeSpan, stream: DStream[Metric]) = stream foreachRDD { rdd => save(rdd) }
 
   private[almanac] def readKeys(buckets: Set[String], geoFilter: GeoFilter, criteria: Criteria): RDD[KeyIndex] = {
-    // TODO: read facts by Criteria
     require(buckets.nonEmpty, "can't pass in empty buckets when reading facts")
-    val geoConditions = getGeoConditions(geoFilter)
+    val geohashes = getGeoHashes(geoFilter)
 
-    buckets.map { bucket => {
-      val whereClause = all(
-        getBucketConditions(bucket), // bucket = '$bucket'
-        geoConditions)               // geohash IN ('$gh1', '$gh2', ...)
-
-      sc.cassandraTable[KeyIndex](KEYSPACE, FACTS_TABLE)
-        .select(
-          COLUMN_NAMES.BUCKET,
-          COLUMN_NAMES.GEOHASH,
-          COLUMN_NAMES.FACT_KEY,
-          COLUMN_NAMES.FACTS)
-        .where(whereClause)
-    } }.reduceLeft[RDD[KeyIndex]](_ union _)
+    buckets.map(readKeys(_, geohashes, criteria)).reduceLeft[RDD[KeyIndex]] (_ union _)
   }
+
+  private[almanac] def readKeys(bucket: String, geohashes: Set[String], criteria: Criteria): RDD[KeyIndex] =
+    // TODO: read facts by Criteria
+    sc.cassandraTable[KeyIndex](KEYSPACE, FACTS_TABLE)
+      .select(
+        COLUMN_NAMES.BUCKET,
+        COLUMN_NAMES.GEOHASH,
+        COLUMN_NAMES.FACT_KEY,
+        COLUMN_NAMES.FACTS)
+      .where(all(
+        getBucketConditions(bucket), // bucket = '$bucket'
+        getGeoConditions(geohashes))) // geohash IN ('$gh1', '$gh2', ...))
 
   /**
    *
@@ -170,7 +169,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
     joinRead(factsIndice, query.timeFilter)
   }
 
-  private def withfactsJoinRead(query: MetricsQuery): RDD[Metric] = {
+  private def withFactsJoinRead(query: MetricsQuery): RDD[Metric] = {
     val factsIndice = readKeys(query.buckets, query.geoFilter, query.criteria)
 
     joinRead(factsIndice, query.timeFilter)
@@ -203,7 +202,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
    */
   def read(query: MetricsQuery): RDD[Metric] = query.criteria match {
     case NonFactCriteria => noFactsJoinRead(query)
-    case _ => withfactsJoinRead(query)
+    case _ => withFactsJoinRead(query)
   }
 
   private def all(conditions: String*) = conditions mkString " AND "
@@ -234,17 +233,19 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
    * @param geoFilter
    * @return
    */
-  private def getGeoConditions(geoFilter: GeoFilter) =
-    if (geoFilter == WORLDWIDE) s"${COLUMN_NAMES.GEOHASH} = ''" // geohash = ""
+  private def getGeoConditions(geoFilter: GeoFilter): String =
+    if (geoFilter == WORLDWIDE) getGeoConditions("") // geohash = ""
     else {
       val geohashes = getGeoHashes(geoFilter)
-
-      // TODO: check if this is empty then throw exception
-      if (geohashes.nonEmpty) {
-        val geohashList = geohashes.map(gh => s"'$gh'").mkString(", ")
-        s"${COLUMN_NAMES.GEOHASH} IN ($geohashList)"            // geohash IN ('$geohashes')
-      } else s"${COLUMN_NAMES.GEOHASH} = ''"                    // geohash = ""
+      getGeoConditions(geohashes)
     }
+
+  private def getGeoConditions(geohashes: Set[String]): String =
+    // TODO: check if this is empty then throw exception not worldwide
+    if (geohashes.nonEmpty) {
+      val geohashList = geohashes.map(gh => s"'$gh'").mkString(", ")
+      s"${COLUMN_NAMES.GEOHASH} IN ($geohashList)" // geohash IN ('$geohashes')
+    } else getGeoConditions("")                    // geohash = ""
 
   private def getGeoHashes(geoFilter: GeoFilter): Set[String] = {
     val precisions = schedules.geoPrecisions.filter(_ <= geoFilter.maxPrecision).toSet
