@@ -2,9 +2,11 @@ package almanac.spark
 
 import akka.actor.{Actor, ActorRef}
 import almanac.model.Metric._
+import almanac.model.TimeFilter._
 import almanac.model.{Metric, TimeSpan}
 import almanac.persist.MetricRDDRepository
 import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.Minutes
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.receiver.ActorHelper
 
@@ -52,6 +54,11 @@ class SparkMetricsAggregator(stream: DStream[Metric], repo: MetricRDDRepository)
     resultStream
   }
 
+  def keyProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = repo.saveKeys(stream
+    .window(Minutes(1), Minutes(1))
+    .aggregateByTimeSpan(ALL_TIME.span)
+    .map(_.key))
+
   /**
    * aggregate the first timeSchedule to the intial stream
    * then aggregate on each level of timeSchedules and geoSchedules like below:
@@ -81,7 +88,7 @@ class SparkMetricsAggregator(stream: DStream[Metric], repo: MetricRDDRepository)
       // aggregate geo and save result stream
       (geoProcess(tranStream, precision, intialTimeSpan) /: otherTimeSchedules) ( (geoResult, span) => {
         // aggregate fact and handle result stream
-        repo.saveFacts(geoResult)
+        keyProcess(geoResult, precision, span)
         // aggregate time and handle result stream
         timeProcess(geoResult, precision, span)
       })

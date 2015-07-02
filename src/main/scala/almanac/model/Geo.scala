@@ -127,9 +127,10 @@ object GeoHash {
      */
     def roundOrPad(precision: Int): String = {
       require(precision >= 0)
-      val delta = precision - geohash.length
+      val targetPrecision = math.min(precision, MAX_PRECISION)
+      val delta = targetPrecision - geohash.length
       val sb = new StringBuilder(geohash)
-      if (delta <= 0) sb.substring(0, precision)
+      if (delta <= 0) sb.substring(0, targetPrecision)
       else ((sb append "s") /: (1 until delta)) { (sb, _) => sb append "0" } toString
     }
 
@@ -318,7 +319,7 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
     (left1 <= left2  && left2  <  right1) || // l2 E (l1, r1]
     (left1 <  right2 && right2 <= right1) || // r2 E [l1, r1)
     (left2 <= left1  && left1  <  right2) || // l1 E (l2, r2]
-    (left2 <  right1 && right1 <= right2) || // r2 E [l2, r1)
+    (left2 <  right1 && right1 <= right2) || // r1 E [l2, r2)
     (left1 > right1 && !(left1 == 180 && right1 == -180)) && (                  // if IDL E [l1, r1]
       (left1 <= left2  && left2  <= 180) || (-180 <= left2  && left2  <  right1) || // l2 E (l1, IDL] U [IDL, r1]
       (left1 <  right2 && right2 <= 180) || (-180 <= right2 && right2 <= right1)    // r2 E [l1, IDL] U [IDL, r1)

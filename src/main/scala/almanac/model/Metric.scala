@@ -73,7 +73,7 @@ object Metric {
     def + (that: Value) = Value(count + that.count, total + that.total)
   }
 
-  case class RawBuilder private[model](facts: FactMap, geohash: String = "", optTime: Option[Long]=None) {
+  private[model] case class RawBuilder private[model](facts: FactMap, geohash: String = "", optTime: Option[Long]=None) {
     /**
      *
      * @param newFacts

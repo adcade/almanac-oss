@@ -1,12 +1,13 @@
 package almanac.service
 
 import akka.actor.ActorRef
-import akka.pattern._
 import akka.util.Timeout
 import almanac.model.{Criteria, Metric, MetricsQuery}
-import almanac.service.MetricsProtocol.{Query, QueryResult, Record}
+import almanac.persist.MetricRDDRepository
+import almanac.service.MetricsProtocol.Record
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext.Implicits._
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 trait AlmanacService {
@@ -23,7 +24,7 @@ trait AlmanacService {
   def record(metrics: Metric*): Unit
 }
 
-class ActorAlmanacService(alamancActor: ActorRef)(implicit ec: ExecutionContext) extends AlmanacService {
+class ActorAlmanacService(alamancActor: ActorRef, repo: MetricRDDRepository) extends AlmanacService {
   implicit val timeout = Timeout(100 millis)
 
   override def createSpace(space: String): Unit = ???
@@ -36,7 +37,5 @@ class ActorAlmanacService(alamancActor: ActorRef)(implicit ec: ExecutionContext)
 
   override def buckets(criteria: Criteria, pattern: String): Future[Seq[String]] = ???
 
-  override def query(query: MetricsQuery): Future[Seq[Metric]] = (alamancActor ? Query(query)).map {
-    case QueryResult(metrics) => metrics
-  }
+  override def query(query: MetricsQuery): Future[Seq[Metric]] = Future {repo read query} map (_.collect())
 }

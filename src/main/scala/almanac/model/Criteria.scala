@@ -18,9 +18,12 @@ object Criteria {
   def fact(fact: String) = FactCriteriaBuilder(fact)
   def all(others: Criteria*) = (others foldLeft And())(_ and _)
   def any(others: Criteria*) = (others foldLeft Or()) (_ or _)
+  def nofact = NonFactCriteria
 }
 
 object NonCriteria extends Criteria
+
+object NonFactCriteria extends Criteria
 
 sealed trait FactCriteria[R] extends Criteria {
   val reference: R
@@ -36,6 +39,11 @@ case class Like (fact: String, reference: String     ) extends FactCriteria[Stri
 
 sealed trait CollectiveCriteria extends Iterable[Criteria] with Criteria {
   protected val criteria: Set[Criteria]
+
+  /**
+   *
+   * @return
+   */
   override def iterator: Iterator[Criteria] = criteria.iterator
 
   override def toString: String = "(   " + (
@@ -43,7 +51,16 @@ sealed trait CollectiveCriteria extends Iterable[Criteria] with Criteria {
   ) + "\n)"
 }
 
+/**
+ *
+ * @param criteria
+ */
 case class And private[model] (criteria: Set[Criteria] = Set()) extends CollectiveCriteria {
+  /**
+   *
+   * @param that
+   * @return
+   */
   override def and(that: Criteria): And = that match {
     case NonCriteria => this
     case otherAll: And => And(this.criteria ++ otherAll.criteria)
@@ -51,7 +68,16 @@ case class And private[model] (criteria: Set[Criteria] = Set()) extends Collecti
   }
 }
 
+/**
+ *
+ * @param criteria
+ */
 case class Or private[model] (criteria: Set[Criteria] = Set()) extends CollectiveCriteria {
+  /**
+   *
+   * @param that
+   * @return
+   */
   override def or(that: Criteria): Or = that match {
     case NonCriteria => this
     case otherAny: Or => Or(this.criteria ++ otherAny.criteria)
