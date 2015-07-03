@@ -164,15 +164,15 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
       geohash <- getGeoHashes(query.geoFilter)
     } yield KeyIndex(bucket, geohash, FACTKEY_OF_EMPTY, Map())
 
-    val factsIndice = sc.parallelize(partitionKeys toSeq).repartitionByCassandraReplica(KEYSPACE, METRICS_TABLE)
+    val keyIndice = sc.parallelize(partitionKeys toSeq).repartitionByCassandraReplica(KEYSPACE, METRICS_TABLE)
 
-    joinRead(factsIndice, query.timeFilter)
+    joinRead(keyIndice, query.timeFilter)
   }
 
   private def withFactsJoinRead(query: MetricsQuery): RDD[Metric] = {
-    val factsIndice = readKeys(query.buckets, query.geoFilter, query.criteria)
+    val keyIndice = readKeys(query.buckets, query.geoFilter, query.criteria)
 
-    joinRead(factsIndice, query.timeFilter)
+    joinRead(keyIndice, query.timeFilter)
   }
 
   private def joinRead(rdd: RDD[KeyIndex], timeFilter: TimeFilter) = rdd
@@ -211,12 +211,12 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
 
   private def getTimeCondidtions(filter: TimeFilter): String = all((
     if (filter == TimeFilter.ALL_TIME)
-         Seq(s"${COLUMN_NAMES.TIMESTAMP} = 0" )                  // timestamp = 0
+         Seq(s"${COLUMN_NAMES.TIMESTAMP} = 0",                   // timestamp = 0
+             s"${COLUMN_NAMES.SPAN} = ${filter.span.index}")     // span = $span.index
 
     else Seq(s"${COLUMN_NAMES.TIMESTAMP} >= ${filter.fromTime}", // timestamp >= $fromTime
-             s"${COLUMN_NAMES.TIMESTAMP} < ${filter.toTime}")    // timestamp < $toTime
-
-          :+ s"${COLUMN_NAMES.SPAN} = ${filter.span.index}"      // span = $span.index
+             s"${COLUMN_NAMES.TIMESTAMP} < ${filter.toTime}",    // timestamp < $toTime
+             s"${COLUMN_NAMES.SPAN} = ${filter.span.index}")     // span = $span.index
   ):_*)
 
   /**
