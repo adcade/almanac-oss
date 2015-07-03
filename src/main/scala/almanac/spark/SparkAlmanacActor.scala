@@ -54,7 +54,7 @@ class SparkAlmanacActor extends Actor with Logging {
     case Query(query) =>
       println("query")
       // TODO: call aggregator do facts group, ordering and limit/paging
-      val resultRDD = repo read query
+      val resultRDD = repo read query aggregateByFacts query.groupNames
       sender ! QueryResult(resultRDD collect())
   }
 

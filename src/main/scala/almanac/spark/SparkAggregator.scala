@@ -13,7 +13,7 @@ import scala.language.postfixOps
 trait MetricsAggregator[Source] {
   val source: Source
   def aggregateByTimeSpan(span: TimeSpan) = aggregate(_ ~ span)
-  def aggregateByFacts(facts: String*) = aggregate(_ & facts)
+  def aggregateByFacts(facts: Seq[String]) = aggregate(_ & facts)
   def aggregateByGeoPrecision(precision: Int) = aggregate(_ ~ precision)
   // def aggregateByBucket(regex: String) = aggregate(_.bucket.matches(regex))
 
