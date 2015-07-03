@@ -4,7 +4,7 @@ import almanac.AlmanacSettings
 import almanac.model.GeoFilter.WORLDWIDE
 import almanac.model._
 import almanac.persist.CassandraMetricRDDRepository._
-import almanac.spark.SparkMetricsAggregator._
+import almanac.spark.AggregationSchedules
 import almanac.util.MD5Helper._
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.types._

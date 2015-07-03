@@ -2,11 +2,11 @@ package almanac
 
 import almanac.AlmanacSettings._
 import almanac.persist.CassandraMetricRDDRepository
-import almanac.spark.SparkMetricsAggregator
-import almanac.spark.SparkMetricsAggregator.AggregationSchedules
-import almanac.util.MetricsReceiver
-import org.apache.spark.streaming.{Seconds, Milliseconds, StreamingContext}
-import org.apache.spark.{SparkContext, SparkConf}
+import almanac.spark.AggregationSchedules
+import almanac.spark.SparkMetricsAggregator._
+import almanac.util.RandomMetricsReceiver
+import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 object AlmanacDemo extends App{
   val conf = new SparkConf(true)
@@ -19,11 +19,11 @@ object AlmanacDemo extends App{
   val ssc = new StreamingContext(sc, Milliseconds(SparkStreamingBatchDuration))
 
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
-  val metricsStream = ssc receiverStream new MetricsReceiver
+  val metricsStream = ssc receiverStream new RandomMetricsReceiver
 
+  implicit val rddRepo = new CassandraMetricRDDRepository(sc, schedules)
+  metricsStream aggregateWithSchedule schedules
   metricsStream window(Seconds(10), Seconds(10)) count() print()
-  val rddRepo = new CassandraMetricRDDRepository(sc, schedules)
-  val aggregator = new SparkMetricsAggregator(metricsStream, rddRepo) schedule schedules
 
   ssc start()
   ssc awaitTermination()

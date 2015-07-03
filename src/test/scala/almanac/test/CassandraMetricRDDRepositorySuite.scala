@@ -7,8 +7,8 @@ import almanac.model.TimeSpan._
 import almanac.model._
 import almanac.persist.CassandraMetricRDDRepository
 import almanac.persist.CassandraMetricRDDRepository.KeyIndex
-import almanac.spark.SparkMetricsAggregator._
-import almanac.test.TestUtils.{time, avg}
+import almanac.spark.AggregationSchedules
+import almanac.test.TestUtils.{avg, time}
 import almanac.util.MD5Helper._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
@@ -17,9 +17,9 @@ import org.joda.time.DateTime
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.mutable
-import scala.concurrent.{Future, Await}
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
 
@@ -54,7 +54,7 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
     repo.save(0, HOUR, stream)
 
     for (_ <- 1 to 3) {
-      q += sc.makeRDD(metrics)
+      q += sc makeRDD metrics
     }
     ssc.start()
     ssc.awaitTerminationOrTimeout(400)
@@ -141,7 +141,7 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
 
     def printAvg(allTime: Seq[Long]) = println(s"Elapsed time: ${avg(allTime)} ms")
 
-    printAvg(Await.result( Future.sequence((1 to num) map (_=> Future { time { work } } )), 1 hour))
-    printAvg((1 to num) map (_=> time { work }))
+    printAvg(Await.result( Future.sequence(1 to num map (_=> Future { time { work } } )), 1 hour))
+    printAvg(1 to num map (_=> time { work }))
   }
 }

@@ -32,7 +32,7 @@ object MetricsGenerator {
   def generateRawWithGeo = metric locate(random(latRange) x random(lngRange)) increment random(buckets)
 }
 
-class MetricsReceiver extends Receiver[Metric](MEMORY_ONLY) with Logging {
+class RandomMetricsReceiver extends Receiver[Metric](MEMORY_ONLY) with Logging {
   private def receive() = {
     try {
       logInfo("Start generating random metrics")

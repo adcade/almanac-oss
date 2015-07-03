@@ -26,7 +26,7 @@ class GeoSuite extends FunSuite with Matchers {
     val geohash = "dr5ru1pcr6gu"
     val ((lat1,lng1), (lat2, lng2)) = toBounds(geohash)
     GeoRect(geohash ~ 0) should be (GeoRect(90, 180, -90, -180))
-    (12 to 0 by -1) foreach {x => println( (x, GeoRect(geohash ~ x)) )}
+    12 to 0 by -1 foreach {x => println( (x, GeoRect(geohash ~ x)) )}
   }
 
   test("geohash round to any precision") {

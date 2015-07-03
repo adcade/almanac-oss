@@ -1,13 +1,15 @@
 package almanac.service
 
-import almanac.model.{Criteria, Metric, MetricsQuery}
+import almanac.model.{TimeSpan, Criteria, Metric, MetricsQuery}
 
 import scala.concurrent.Future
 
 trait AlmanacService {
   def createSpace(space: String): Unit
 
-  def query(query: MetricsQuery): Future[Seq[Metric]]
+  def retrieve(query: MetricsQuery): Future[Seq[Metric]]
+
+  def stream(query: MetricsQuery, batch: Int): Stream[Seq[Metric]] = ???
 
   def buckets(criteria: Criteria): Future[Seq[String]]
 

@@ -171,11 +171,13 @@ object Metric {
   def withFacts(facts: FactMap) = RawBuilder(facts)
 }
 
-sealed abstract class TimeSpan(val strip: Strip, val dateFormatPattern: String = "yyyy") extends Serializable {
+sealed abstract class TimeSpan(val strip: Strip, val dateFormatPattern: String = "yyyy")
+  extends Ordered[TimeSpan] with Serializable {
+
   lazy val dateFormat = new SimpleDateFormat(dateFormatPattern)
 
-  private val secondIndex = 2
   lazy val index = values.indexOf(this)
+  override def compare(that: TimeSpan): Int = index - that.index
 
   /**
    * to strip the extra bits from a DateTime to make a new DateTime that is of the beginning of the TimeSpan
@@ -187,7 +189,7 @@ sealed abstract class TimeSpan(val strip: Strip, val dateFormatPattern: String =
    */
   def apply(timestamp: Long): Long = {
     if (this == ALL_TIME) 0L
-    else (secondIndex to this.index foldLeft new DateTime(timestamp, UTC)) {
+    else (SECOND.index to this.index foldLeft new DateTime(timestamp, UTC)) {
       (datetime, i) => values(i).strip(datetime)
     }.getMillis
   }
