@@ -8,7 +8,7 @@ import almanac.util.MetricsReceiver
 import org.apache.spark.streaming.{Seconds, Milliseconds, StreamingContext}
 import org.apache.spark.{SparkContext, SparkConf}
 
-class AlmanacDemo {
+object AlmanacDemo extends App{
   val conf = new SparkConf(true)
     .set("spark.cassandra.connection.host", CassandraSeed)
     .set("spark.cleaner.ttl", SparkCleanerTtl.toString)
@@ -23,7 +23,7 @@ class AlmanacDemo {
 
   metricsStream window(Seconds(10), Seconds(10)) count() print()
   val rddRepo = new CassandraMetricRDDRepository(sc, schedules)
-  SparkMetricsAggregator(metricsStream, rddRepo) schedule schedules
+  val aggregator = new SparkMetricsAggregator(metricsStream, rddRepo) schedule schedules
 
   ssc start()
   ssc awaitTermination()

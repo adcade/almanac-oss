@@ -215,7 +215,7 @@ object TimeSpan {
   private lazy val values: Seq[TimeSpan with Product] = Seq(ALL_TIME, RAW, SECOND, MINUTE, HOUR, DAY, MONTH, YEAR)
 
   /**
-   * for convert from index to TimeSpan, just do <code>TimeSpan(index)</code>
+   * for convert from index to TimeSpan, just do `TimeSpan(index)`
    *
    * @param index index of the TimeSpan for serialization purpose
    * @return
@@ -225,7 +225,7 @@ object TimeSpan {
   private lazy val lookup: Map[String, TimeSpan] = values map (s => s.toString -> s) toMap
 
   /**
-   * for convert from name String to TimeSpan, just do <code>TimeSpan(name)</code>
+   * for convert from name String to TimeSpan, just do `TimeSpan(name)`
    *
    * @param name
    * @return

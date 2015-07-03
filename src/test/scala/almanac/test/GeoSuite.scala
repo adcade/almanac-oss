@@ -21,9 +21,7 @@ class GeoSuite extends FunSuite with Matchers {
   }
 
   test("toBounds should return ?") {
-    toBounds("g") should be ((45.0, 90.0), (-45.0, 0))
     GeoRect("g") should be (GeoRect(90, 0, 45, -45))
-    toBounds("") should be ((-90, 90), (-180, 180))
     GeoRect("") should be (GeoRect(90, 180, -90, -180))
     val geohash = "dr5ru1pcr6gu"
     val ((lat1,lng1), (lat2, lng2)) = toBounds(geohash)
@@ -52,21 +50,12 @@ class GeoSuite extends FunSuite with Matchers {
   }
 
   test ("geohash padding") {
-    println(GeoHash.encode(40.75927734375, -73.98193359375))
-    println(40.75927734376 x -73.98193359376 geohash)
-    println(Coordinate("dr5ru"))
-    println(Coordinate("dr5rus000000"))
-    println(Coordinate("dr5rukppbpbpb"))
-    println(Coordinate("dr5ru").geohash)
     val co = Coordinate("dr5ru" ~ 8)
     co.lat should be (40.75927734375 +- 0.001)
     co.lng should be (-73.98193359375 +- 0.001)
     val co2 = Coordinate("dr5ru" ~ 12)
     co2.lat should be (40.75927734375 +- 0.00001)
     co2.lng should be (-73.98193359375 +- 0.00001)
-
-//    dr72h56v5p28
-//    dr5ru
   }
 
   test("longitude -45 westOf 45 westOf 135 westOf -135 westOf -45") {

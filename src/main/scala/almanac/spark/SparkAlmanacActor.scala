@@ -1,34 +1,66 @@
 package almanac.spark
 
-import akka.actor.{Actor, ActorRef}
-import akka.pattern._
-import akka.util.Timeout
-import almanac.model.{Metric, TimeSpan}
-import almanac.service.MetricsProtocol.{Query, Record}
+import akka.actor._
+import almanac.AlmanacSettings._
+import almanac.model.Metric
+import almanac.persist.{CassandraMetricRDDRepository, MetricRDDRepository}
+import almanac.service.MetricsProtocol.{Query, QueryResult, Record}
 import almanac.spark.SparkMetricsAggregator._
-import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.storage.StorageLevel._
+import org.apache.spark.streaming.receiver.Receiver
+import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
+import org.apache.spark.{Logging, SparkConf, SparkContext}
 
-import scala.concurrent.duration._
+class SparkAlmanacActor extends Actor with Logging {
+  val conf = new SparkConf(true)
+    .set("spark.cassandra.connection.host", CassandraSeed)
+    .set("spark.cleaner.ttl", SparkCleanerTtl.toString)
+    .setAppName("almanac")
+    .setMaster(SparkMaster)
 
-case class MetricsAggregation(timeSchedule: Seq[TimeSpan], geoSchedule: Seq[Int])
-case class MetricsRDD(rdd: RDD[Metric])
-case class MetricsDStream(strea: DStream[Metric])
+  val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
+  val sc = SparkContext getOrCreate conf
+  // FIXME: checkpoint path
+  val ssc = StreamingContext getActiveOrCreate createNewStreamingContext
 
-class SparkAlmanacActor(persistor: ActorRef) extends Actor {
+  val receiver = new MetricReceiver
+  // TODO: dynamic name?
+  val metricsStream = ssc receiverStream receiver
 
-  implicit val timeout = Timeout(100 millis)
-  implicit val ec = context.dispatcher
+  metricsStream window(Seconds(10), Seconds(10)) count() print()
+  val repo = new CassandraMetricRDDRepository(sc, schedules)
+  val aggregator = new SparkMetricsAggregator(metricsStream, repo)
+  aggregator schedule schedules
+
+  private def createNewStreamingContext() = new StreamingContext(sc, Milliseconds(SparkStreamingBatchDuration))
+
+  override def preStart() = ssc.start()
 
   def receive: Receive = {
-    case Record(metrics) => {
+    case Record(metrics) => receiver receive metrics
 
-    }
-    case q @ Query(query) => {
-      val future = (persistor ? q).collect ({
-        case MetricsRDD(rdd) => rdd aggregateByFacts (query.groupNames:_*)
-      })
-      future.pipeTo(sender)
+    case Query(query) =>
+      // TODO: call aggregator do facts group, ordering and limit/paging
+      val resultRDD = repo read query
+      sender ! QueryResult(resultRDD collect())
+  }
+
+  override def postStop() = StreamingContext getActive() foreach {
+    _.stop(stopSparkContext = true, stopGracefully = true)
+  }
+}
+
+class MetricReceiver extends Receiver[Metric](MEMORY_ONLY) with Logging {
+  def receive(metrics: Seq[Metric]) = {
+    try {
+      logInfo(s"Sending: ${metrics.size} metrics")
+      store(metrics.iterator)
+      // TODO: restart if stopped ??? what about all the messages received before restart complete?
+    } catch {
+      case t: Throwable => restart("Error receiving data", t)
     }
   }
+
+  override def onStart(): Unit = {}
+  override def onStop(): Unit = {}
 }

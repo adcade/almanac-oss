@@ -8,6 +8,7 @@ import almanac.model._
 import almanac.persist.CassandraMetricRDDRepository
 import almanac.persist.CassandraMetricRDDRepository.KeyIndex
 import almanac.spark.SparkMetricsAggregator._
+import almanac.test.TestUtils.{time, avg}
 import almanac.util.MD5Helper._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
@@ -16,6 +17,9 @@ import org.joda.time.DateTime
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.mutable
+import scala.concurrent.{Future, Await}
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
 
@@ -84,18 +88,17 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
     repo save metricsRdd
     repo saveKeys metricsRdd.map(_.key)
 
-    val startTime = System.currentTimeMillis
-
     val query = select("std.impression")
             .locate(GeoRect("dr5"), 7)
             .time(HOUR, HOUR(timestamp), HOUR(timestamp) + 3600000)
             .query
 
+    val startTime = System.currentTimeMillis
     val result = (repo read query) collect()
 
     val duration = System.currentTimeMillis - startTime
-    duration should be <= 300L
-    println(duration)
+    duration should be <= 500L
+    println(s"Elapsed time: $duration ms")
 
     result map(_.key) should contain theSameElementsAs (metrics map (_.key) filter (_.bucket=="std.impression"))
   }
@@ -109,21 +112,36 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
       Metric.Key(k.bucket, Map(), k.span, k.timestamp, k.geohash)
     } toSet
 
-    val startTime = System.currentTimeMillis
-
     val query = select("std.impression")
       .where(nofact)
       .locate(GeoRect("dr5"), 7)
       .time(HOUR, HOUR(timestamp), HOUR(timestamp) + 3600000)
       .query
-    val result = (repo read query) collect()
 
+    val startTime = System.currentTimeMillis
+    val result = (repo read query) collect()
     val duration = System.currentTimeMillis - startTime
     duration should be <= 500L
-    println(duration)
+    println(s"Elapsed time: $duration ms")
 
     // FIXME: the result seems to be wrong! we didn't save any no fact metrics!!!
     // TODO: this is even slower than the join version
     result map(_.key) should contain theSameElementsAs (expected)
+  }
+
+  test ("performance") {
+    val repo = new CassandraMetricRDDRepository(sc, schedules)
+
+    def work = (repo read select("std.impression")
+      .locate(GeoRect("dr5"), 7)
+      .time(HOUR, HOUR(timestamp), HOUR(timestamp) + 3600000)
+      .query) collect()
+
+    val num = 10000
+
+    def printAvg(allTime: Seq[Long]) = println(s"Elapsed time: ${avg(allTime)} ms")
+
+    printAvg(Await.result( Future.sequence((1 to num) map (_=> Future { time { work } } )), 1 hour))
+    printAvg((1 to num) map (_=> time { work }))
   }
 }

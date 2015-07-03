@@ -3,13 +3,15 @@ package almanac.spark
 import akka.actor.{Actor, ActorRef}
 import almanac.model.Metric._
 import almanac.model.TimeFilter._
-import almanac.model.{Metric, TimeSpan}
+import almanac.model.{Criteria, MetricsQuery, Metric, TimeSpan}
 import almanac.persist.MetricRDDRepository
+import almanac.service.AlmanacService
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.Minutes
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.receiver.ActorHelper
 
+import scala.concurrent.Future
 import scala.language.postfixOps
 import scala.reflect.ClassTag
 
@@ -34,7 +36,7 @@ class SparkMetricsAggregator(stream: DStream[Metric], repo: MetricRDDRepository)
    * @param span
    * @return
    */
-  def geoProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
+  private def geoProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
     val resultStream = stream aggregateByGeoPrecision precision
     repo.save(precision, span, resultStream)
     resultStream
@@ -48,13 +50,13 @@ class SparkMetricsAggregator(stream: DStream[Metric], repo: MetricRDDRepository)
    * @param span
    * @return
    */
-  def timeProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
+  private def timeProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = {
     val resultStream = stream aggregateByTimeSpan span
     repo.save(precision, span, resultStream)
     resultStream
   }
 
-  def keyProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = repo.saveKeys(stream
+  private def keyProcess(stream: DStream[Metric], precision: Int, span: TimeSpan) = repo.saveKeys(stream
     .window(Minutes(1), Minutes(1))
     .aggregateByTimeSpan(ALL_TIME.span)
     .map(_.key))
@@ -108,26 +110,4 @@ object SparkMetricsAggregator {
     override def aggregate(func: Key => Key) =
       source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
   }
-
-  def apply(stream: DStream[Metric], repo: MetricRDDRepository) =
-    new SparkMetricsAggregator(stream, repo)
-
-}
-
-case class SubscribeReceiver(receiverActor: ActorRef)
-case class UnsubscribeReceiver(receiverActor: ActorRef)
-
-import almanac.service.MetricsProtocol._
-
-class MetricsActorReceiver[T: ClassTag] (urlOfPublisher: String)
-  extends Actor with ActorHelper {
-  lazy private val publisher = context.actorSelection(urlOfPublisher)
-
-  override def preStart(): Unit = publisher ! SubscribeReceiver(context.self)
-
-  def receive = {
-    case Record(metrics) => store(metrics)
-  }
-
-  override def postStop(): Unit = publisher ! UnsubscribeReceiver(context.self)
 }

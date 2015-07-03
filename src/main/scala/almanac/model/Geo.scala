@@ -135,7 +135,7 @@ object GeoHash {
     }
 
     /**
-     * convenient method for <link>roundOrPad</link>
+     * convenient method for `roundOrPad`
      *
      * @param precision
      * @return
@@ -150,13 +150,12 @@ object Coordinate {
     /**
      * latitude intersect longitude, to build a coordinate
      * let's say you have:
-     * <code>
+     * {{{
      *  val lat = 3.0;
      *  val lng = 4.0
-     * </code>
+     * }}}
      * then
-     * <code>lat x lng</code> will return you a
-     * <code>Coordinate(lat, lng)</code>
+     * {{{ lat x lng }}} will return you a `Coordinate`
      *
      * @param longitude the longitude to intersect with
      * @return a Coordinate of the included latitude and the passed longitude
@@ -199,9 +198,9 @@ object GeoRect {
    * warning this class is convenient, but here is the caveats:
    *
    * It is ambious situation where the bigger rectangle is desired or the smaller one!
-   * for example, give co1(45, 20) co2(30, -20) there is two possible rectangle:
+   * for example, give `Coordinate(45, 20)` and `Coordinate(30, -20)` there is two possible rectangle:
    *
-   *  co1(45, 20, 30, -20) and co2(45, -20, 30, -20)
+   *  `GeoRect(45, 20, 30, -20)` and `GeoRect(45, -20, 30, -20)`
    *
    * here this function will simply use the smaller rectangle,
    * that is the distance between left and right is always less than 180 degree

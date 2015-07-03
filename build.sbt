@@ -44,6 +44,8 @@ scalacOptions ++= Seq(
   "-encoding", "UTF-8"
 )
 
+fork in run := true
+
 crossPaths := false
 
 parallelExecution in Test := false
