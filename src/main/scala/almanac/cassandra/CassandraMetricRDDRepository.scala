@@ -1,11 +1,10 @@
 package almanac.cassandra
 
 import almanac.AlmanacSettings
-import almanac.api.MetricRDDRepository
 import almanac.model.GeoFilter.GlobalFilter
 import almanac.model.TimeFilter.EverFilter
 import almanac.model._
-import almanac.spark.{AggregationSchedules, AlmanacMetrcRDDRepositoryFactory}
+import almanac.spark.{MetricRDDRepository, AggregationSchedules, AlmanacMetrcRDDRepositoryFactory}
 import almanac.util.MD5Helper._
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.types._

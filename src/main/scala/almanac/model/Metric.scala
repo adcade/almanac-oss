@@ -3,11 +3,11 @@ package almanac.model
 import java.text.SimpleDateFormat
 import java.util.Date
 
+import almanac.model.GeoHash._
 import almanac.model.Metric._
 import almanac.model.TimeSpan._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone.UTC
-import GeoHash._
 
 case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, timestamp: Long, geohash: String,
                   count: Int, total: Long) {

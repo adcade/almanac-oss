@@ -2,13 +2,13 @@ package almanac.api
 
 import akka.actor.ActorSelection
 import akka.pattern._
-import almanac.model.{Criteria, Metric, MetricsQuery}
-import AlmanacProtocol.{Query, QueryResult, Record}
 import akka.util.Timeout
+import almanac.api.AlmanacProtocol.{Query, QueryResult, Record}
+import almanac.model.{Criteria, Metric, MetricsQuery}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class ActorAlmanacClient(almanacActor: ActorSelection) extends AlmanacService {
   implicit val timeout = Timeout(10 seconds)

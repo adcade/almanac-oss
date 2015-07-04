@@ -1,6 +1,6 @@
 package almanac.api
 
-import almanac.model.{TimeSpan, Criteria, Metric, MetricsQuery}
+import almanac.model.{Criteria, Metric, MetricsQuery}
 
 import scala.concurrent.Future
 

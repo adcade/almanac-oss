@@ -1,9 +1,10 @@
 package almanac.kafka
 
 import almanac.AlmanacSettings._
+import almanac.api.MetricSink
 import almanac.model.Metric
 import almanac.model.Metric.{Key, Value, metric}
-import almanac.spark.SparkMetricChannel
+import almanac.spark.DStreamSource
 import kafka.producer.{KeyedMessage, Producer}
 import kafka.serializer.{Decoder, Encoder}
 import kafka.utils.VerifiableProperties
@@ -35,7 +36,7 @@ class MetricValueDecoder(verifiableProperties: VerifiableProperties) extends Dec
   }
 }
 
-object KafkaChannel extends SparkMetricChannel {
+object KafkaChannel extends MetricSink with DStreamSource[Metric] {
   private lazy val producer = new Producer[Key, Value](KafkaProducerConfig)
 
   def stream(ssc: StreamingContext): DStream[Metric] = {

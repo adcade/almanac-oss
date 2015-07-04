@@ -4,24 +4,20 @@ import akka.actor.{ActorSystem, Props}
 import almanac.api.ActorAlmanacClient
 import almanac.cassandra.CassandraMetricRDDRepositoryFactory
 import almanac.kafka.KafkaChannel
-import almanac.model.{GeoFilter, GeoRect}
+import almanac.model.GeoFilter
 import almanac.model.MetricsQuery._
 import almanac.model.TimeSpan._
-import almanac.spark.SparkClientActor
+import almanac.spark.SparkAlmanacActor
 import almanac.util.MetricsGenerator.generateRaw
-import org.joda.time.DateTime
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object AlmanacDemo extends App{
-//  val engine = new SparkAlmanacEngine(CassandraMetricRDDRepositoryFactory, RandomDStreamSource)
-//  engine.start()
-
-//  val timestamp = new DateTime(2001, 9, 8, 21, 46, 40).getMillis
 
   val system = ActorSystem("almanac")
 
   val clientActor = system.actorOf(
-    Props(classOf[SparkClientActor], CassandraMetricRDDRepositoryFactory, KafkaChannel), "clientActor"
+    Props(classOf[SparkAlmanacActor], CassandraMetricRDDRepositoryFactory, KafkaChannel), "clientActor"
   )
 
   val client = new ActorAlmanacClient(system.actorSelection(clientActor.path))

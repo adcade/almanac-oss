@@ -1,6 +1,5 @@
 package almanac.model
 
-//import almanac.model.Coordinate._
 import almanac.model.GeoHash._
 
 object GeoHash {
