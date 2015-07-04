@@ -3,18 +3,31 @@ package almanac.spark
 import almanac.model.GeoFilter._
 import almanac.model.Metric.Key
 import almanac.model._
+import almanac.spark.MetricsAggregator.KeyMapper
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
 
+object MetricsAggregator {
+  type KeyMapper = Key => Key
+
+  def by(span: TimeSpan): KeyMapper = _ ~ span
+  def by(facts: Seq[String]): KeyMapper = _ & facts
+  def by(precision: Int): KeyMapper = _ ~ precision
+  // def by(regex: String): KeyMapper = _.bucket.matches(regex)
+
+  implicit class JoinedAggregator(keyMapper: KeyMapper) extends Serializable {
+    def and(otherKeyMapper: KeyMapper): KeyMapper = key => {
+      otherKeyMapper(keyMapper(key))
+    }
+  }
+}
+
 trait MetricsAggregator[Source] {
   val source: Source
-  def aggregateByTimeSpan(span: TimeSpan) = aggregate(_ ~ span)
-  def aggregateByFacts(facts: Seq[String]) = aggregate(_ & facts)
-  def aggregateByGeoPrecision(precision: Int) = aggregate(_ ~ precision)
-  // def aggregateByBucket(regex: String) = aggregate(_.bucket.matches(regex))
 
-  def aggregate(func: Key => Key): Source
+  def aggregateMetrics(mapper: KeyMapper): Source
 }
 
 trait DStreamSource[M] {
@@ -22,6 +35,7 @@ trait DStreamSource[M] {
 }
 
 trait MetricRDDRepository {
+
   def save(precision: Int, span: TimeSpan, stream: DStream[Metric]): Unit
   def save(precision: Int, span: TimeSpan, stream: RDD[Metric]): Unit
 
@@ -32,3 +46,17 @@ trait MetricRDDRepository {
 
   def readFacts(buckets: Set[String], geoFilter: GeoFilter = GlobalFilter, criteria: Criteria): RDD[Map[String, String]]
 }
+
+trait AlmanacMetrcRDDRepositoryFactory {
+  def apply(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository
+}
+
+/**
+ * Time span levels and Geo precision levels to be aggregated
+ *
+ * please reference to `SparkMetricsAggregator.aggregate` for more detail
+ *
+ * @param geoPrecisions
+ * @param timeSpans
+ */
+case class AggregationSchedules(geoPrecisions: List[Int], timeSpans: List[TimeSpan])

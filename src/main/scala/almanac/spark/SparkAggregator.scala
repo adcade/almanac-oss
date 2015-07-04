@@ -1,76 +1,53 @@
 package almanac.spark
 
-import almanac.model.Metric._
+import almanac.model.Metric.Key
 import almanac.model.TimeSpan.EVER
 import almanac.model._
-import org.apache.spark.SparkContext
+import almanac.spark.MetricsAggregator._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.{Duration, Minutes}
-
-import scala.language.postfixOps
-
-/**
- * Time span levels and Geo precision levels to be aggregated
- *
- * please reference to `SparkMetricsAggregator.aggregate` for more detail
- *
- * @param geoPrecisions
- * @param timeSpans
- */
-case class AggregationSchedules(geoPrecisions: List[Int], timeSpans: List[TimeSpan])
-
-trait AlmanacMetrcRDDRepositoryFactory {
-  def apply(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository
-}
 
 object SparkMetricsAggregator {
 
   implicit class RDDMetricsExtension(val source: RDD[Metric]) extends MetricsAggregator[RDD[Metric]]  {
-    override def aggregate(func: Key => Key) =
+    override def aggregateMetrics(func: KeyMapper) =
       source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
   }
 
   implicit class DStreamMetricsExtension(val source: DStream[Metric]) extends MetricsAggregator[DStream[Metric]] {
-    override def aggregate(func: Key => Key) =
-      source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))
+    override def aggregateMetrics(func: KeyMapper): DStream[Metric] = {
+      source map (m => func(m.key) -> m.value) reduceByKey (_ + _) map (t => Metric(t._1, t._2))
+    }
 
-    def stats(interval: Duration) = source window(interval, interval) count() print()
+    def stats(interval: Duration) = {
+      source
+        .map(m => m.bucket -> m.count)
+        .reduceByKeyAndWindow((a: Int, b: Int) => a + b, Seconds(10), Seconds(10))
+        .print()
+      source
+    }
 
     /**
-     * aggregate geo and save result stream
+     * aggregate geo-precision/time-span and save result stream
      *
-     * @param stream
      * @param precision
      * @param span
      * @return
      */
-    private def geoProcess(stream: DStream[Metric], precision: Int, span: TimeSpan)
-                          (implicit repo: MetricRDDRepository)= {
-      val resultStream = stream aggregateByGeoPrecision precision
-      repo.save(precision, span, resultStream)
-      resultStream
+    def saveMetrics(precision: Int, span: TimeSpan)(implicit repo: MetricRDDRepository): DStream[Metric] = {
+      println(s"save aggregated metrics of precision: $precision, span: $span")
+      repo.save(precision, span, source)
+      source
     }
 
-    /**
-     * aggregate time and handle result stream
-     *
-     * @param stream
-     * @param precision
-     * @param span
-     * @return
-     */
-    private def timeProcess(stream: DStream[Metric], precision: Int, span: TimeSpan)
-                           (implicit repo: MetricRDDRepository)= {
-      val resultStream = stream aggregateByTimeSpan span
-      repo.save(precision, span, resultStream)
-      resultStream
-    }
-
-    private def keyProcess(stream: DStream[Metric], precision: Int, span: TimeSpan)
-                              (implicit repo: MetricRDDRepository) =
+    def saveKeys(precision: Int, span: TimeSpan)(implicit repo: MetricRDDRepository): DStream[Key] = {
       // TODO: configuration of window span
-      repo.saveKeys(stream window(Minutes(1), Minutes(1)) aggregateByTimeSpan EVER map (_.key))
+      val keyStream = source window(Minutes(1), Minutes(1)) aggregateMetrics by(EVER) map (_.key)
+      println(s"save keys of precision: $precision")
+      repo.saveKeys(keyStream)
+      keyStream
+    }
 
     /**
      * aggregate the first timeSchedule to the intial stream
@@ -78,15 +55,7 @@ object SparkMetricsAggregator {
      *
      * Seq(HOUR, DAY, EVER) Seq(8, 4, GLOBAL)
      *
-     * in this case HOUR is the intial time span level for aggregation
-     *
-     * 12, RAW -> initial stream -> 8, HOUR -> DAY -> EVER
-     *                                 |
-     *                                 V
-     *                              4, HOUR -> DAY -> EVER
-     *                                 |
-     *                                 V
-     *                         GLOBAL, HOUR -> DAY -> EVER
+     * 12, RAW -> 8, HOUR -> 8, DAY -> 8, EVER -> 4, EVER -> GLOBAL, EVER
      *
      * the return value is the last aggregated stream in the above case: GLOBAL / EVER
      * @param repo the stream to be aggregated
@@ -94,21 +63,24 @@ object SparkMetricsAggregator {
      * @return the stream of the last aggregated stream
      */
     def aggregateWithSchedule(schedules: AggregationSchedules = defaultSchedules)(implicit repo: MetricRDDRepository) = {
-      // aggregate first level of time span
-      val intialTimeSpan :: otherTimeSchedules = schedules.timeSpans.sorted
-      val initialStream = source aggregateByTimeSpan intialTimeSpan
-      // aggregate
-      (initialStream /: schedules.geoPrecisions.sorted.reverse) ((tranStream, precision) => {
-        // aggregate geo and save result stream
-        (geoProcess(tranStream, precision, intialTimeSpan) /: otherTimeSchedules) ( (geoResult, span) => {
-          // aggregate fact and handle result stream
-          keyProcess(geoResult, precision, span)
-          // aggregate time and handle result stream
-          timeProcess(geoResult, precision, span)
-        })
-      })
+      val spans = schedules.timeSpans.sorted
+      val precisions = schedules.geoPrecisions.sorted.reverse
+
+      val firstStream =
+        source aggregateMetrics by(spans.head)
+
+      (firstStream /: precisions) { (previousGeoStream, precision) =>
+        val nextStream = previousGeoStream aggregateMetrics by(precision) saveMetrics(precision, spans.head)
+        nextStream saveKeys (precision, spans.last)
+
+        (nextStream /: spans.tail) { (previousSpanStream, span) =>
+          previousSpanStream aggregateMetrics by(span) saveMetrics(precision, span)
+        }
+        nextStream
+      }
     }
   }
 
   val defaultSchedules = AggregationSchedules(List(GeoHash.GLOBAL), List(TimeSpan.EVER))
+
 }

@@ -24,7 +24,7 @@ class ActorAlmanacClient(almanacActor: ActorSelection) extends AlmanacService {
   override def buckets(criteria: Criteria, pattern: String): Future[Seq[String]] = ???
 
   override def retrieve(query: MetricsQuery): Future[Seq[Metric]] =
-    (almanacActor ? Query(query)) map { case QueryResult(metrics) => metrics}
+    (almanacActor ? Query(query)) map { case QueryResult(metrics) => metrics }
 
   override def stream(query: MetricsQuery, batch: Int): Stream[Seq[Metric]] = ???
 

@@ -40,6 +40,7 @@ object AlmanacSettings {
     .setAppName("almanac")
     .setMaster(SparkMaster)
     .set("spark.cassandra.connection.host", CassandraSeed)
+    .set("spark.ui.enabled", config.getBoolean("spark.ui.enabled").toString)
     .set("spark.cleaner.ttl", SparkCleanerTtl.toString)
 
   val KafkaConsumerParam = Map[String, String](

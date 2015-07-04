@@ -92,6 +92,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
    */
   override def saveKeys(stream: DStream[Metric.Key]) = stream foreachRDD (saveKeys(_))
 
+
   /**
    *
    * @param rdd

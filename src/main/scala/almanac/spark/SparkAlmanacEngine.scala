@@ -8,27 +8,23 @@ import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
 
 class SparkAlmanacEngine(createRepo: AlmanacMetrcRDDRepositoryFactory,
-                         channel: DStreamSource[Metric]) {
+                         source: DStreamSource[Metric]) extends Runnable {
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
 
-  implicit val sc = SparkContext getOrCreate AlmanacSparkConf
-  implicit val repo = createRepo(schedules)
+  // FIXME: checkpointPath
+  val ssc = StreamingContext getActiveOrCreate createStreamingContext
+  implicit val repo = createRepo(schedules)(ssc.sparkContext)
+  source stream(ssc) aggregateWithSchedule schedules stats Seconds(10)
 
-  // FIXME: checkpoint path
-  implicit val ssc = StreamingContext getActiveOrCreate { () =>
-    new StreamingContext(sc, Milliseconds(SparkStreamingBatchDuration))
-  }
+  private def createStreamingContext(): StreamingContext =
+    new StreamingContext(AlmanacSparkConf, Milliseconds(SparkStreamingBatchDuration))
 
-  val metricsStream = channel.stream(ssc)
-  metricsStream aggregateWithSchedule schedules
-  metricsStream window(Seconds(10), Seconds(10)) count() print()
-
-  def start() = {
+  override def run() = {
     ssc.start()
     ssc.awaitTermination()
   }
 
-  def stop() = {
+  def shutdown() = {
     ssc.stop(true, true)
   }
 }

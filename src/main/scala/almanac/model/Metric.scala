@@ -205,7 +205,6 @@ object TimeSpan {
    */
   private type Strip = (DateTime) => (DateTime)
 
-  case object EVER  extends TimeSpan(_ withMillis 0)
   case object RAW       extends TimeSpan(x => x, "yyyy/MM/dd HH:mm:ss.S")
   case object SECOND    extends TimeSpan(_ withMillisOfSecond 0, "yyyy/MM/dd HH:mm:ss")
   case object MINUTE    extends TimeSpan(_ withSecondOfMinute 0, "yyyy/MM/dd HH:mm")
@@ -213,8 +212,9 @@ object TimeSpan {
   case object DAY       extends TimeSpan(_ withHourOfDay 0, "yyyy/MM/dd")
   case object MONTH     extends TimeSpan(_ withDayOfMonth 1, "yyyy/MM")
   case object YEAR      extends TimeSpan(_ withMonthOfYear 1)
+  case object EVER      extends TimeSpan(_ withMillis 0)
 
-  private lazy val values: Seq[TimeSpan with Product] = Seq(EVER, RAW, SECOND, MINUTE, HOUR, DAY, MONTH, YEAR)
+  private lazy val values: Seq[TimeSpan with Product] = Seq(RAW, SECOND, MINUTE, HOUR, DAY, MONTH, YEAR, EVER)
 
   /**
    * for convert from index to TimeSpan, just do `TimeSpan(index)`
