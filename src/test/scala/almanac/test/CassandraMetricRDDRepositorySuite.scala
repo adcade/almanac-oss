@@ -1,12 +1,12 @@
 package almanac.test
 
+import almanac.cassandra.CassandraMetricRDDRepository
+import almanac.cassandra.CassandraMetricRDDRepository.KeyIndex
 import almanac.model.Criteria._
 import almanac.model.GeoHash._
 import almanac.model.MetricsQuery._
 import almanac.model.TimeSpan._
 import almanac.model._
-import almanac.persist.CassandraMetricRDDRepository
-import almanac.persist.CassandraMetricRDDRepository.KeyIndex
 import almanac.spark.AggregationSchedules
 import almanac.test.TestUtils.{avg, time}
 import almanac.util.MD5Helper._
@@ -21,7 +21,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers{
+class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
 
   val conf = new SparkConf().setAppName("almanac")
     .set("spark.cassandra.connection.host", "dev")

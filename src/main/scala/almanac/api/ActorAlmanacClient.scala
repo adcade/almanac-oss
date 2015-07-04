@@ -1,9 +1,9 @@
-package almanac.service
+package almanac.api
 
 import akka.actor.ActorSelection
 import akka.pattern._
 import almanac.model.{Criteria, Metric, MetricsQuery}
-import almanac.service.MetricsProtocol.{Query, QueryResult, Record}
+import AlmanacProtocol.{Query, QueryResult, Record}
 import akka.util.Timeout
 
 import scala.concurrent.Future

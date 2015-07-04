@@ -6,9 +6,12 @@ import almanac.model.Coordinate._
 import almanac.model.GeoHash.Bounds
 import almanac.model.Metric
 import almanac.model.Metric._
+import almanac.spark.DStreamSource
 import almanac.util.MetricsGenerator._
 import org.apache.spark.Logging
 import org.apache.spark.storage.StorageLevel._
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.receiver.Receiver
 
 import scala.util.Random
@@ -63,4 +66,10 @@ class RandomMetricsReceiver extends Receiver[Metric](MEMORY_ONLY) with Logging {
   }
 
   override def onStop() = {}
+}
+
+object RandomDStreamSource extends DStreamSource[Metric] {
+  override def stream(ssc: StreamingContext): DStream[Metric] = {
+    ssc receiverStream new RandomMetricsReceiver
+  }
 }

@@ -1,4 +1,4 @@
-package almanac.service
+package almanac.api
 
 import almanac.model.{TimeSpan, Criteria, Metric, MetricsQuery}
 

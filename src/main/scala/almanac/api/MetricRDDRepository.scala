@@ -1,4 +1,4 @@
-package almanac.persist
+package almanac.api
 
 import almanac.model.GeoFilter._
 import almanac.model._

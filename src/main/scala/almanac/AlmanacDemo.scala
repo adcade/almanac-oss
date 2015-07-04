@@ -1,30 +1,39 @@
 package almanac
 
-import almanac.AlmanacSettings._
-import almanac.persist.CassandraMetricRDDRepository
-import almanac.spark.AggregationSchedules
-import almanac.spark.SparkMetricsAggregator._
-import almanac.util.RandomMetricsReceiver
-import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
-import org.apache.spark.{SparkConf, SparkContext}
+import akka.actor.{ActorSystem, Props}
+import almanac.api.ActorAlmanacClient
+import almanac.cassandra.CassandraMetricRDDRepositoryFactory
+import almanac.kafka.KafkaChannel
+import almanac.model.GeoRect
+import almanac.model.MetricsQuery._
+import almanac.model.TimeSpan._
+import almanac.spark.SparkClientActor
+import almanac.util.MetricsGenerator.generateRaw
+import org.joda.time.DateTime
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object AlmanacDemo extends App{
-  val conf = new SparkConf(true)
-    .set("spark.cassandra.connection.host", CassandraSeed)
-    .set("spark.cleaner.ttl", SparkCleanerTtl.toString)
-    .setAppName("almanac")
-    .setMaster(SparkMaster)
+//  val engine = new SparkAlmanacEngine(CassandraMetricRDDRepositoryFactory, RandomDStreamSource)
+//  engine.start()
 
-  val sc = new SparkContext(conf)
-  val ssc = new StreamingContext(sc, Milliseconds(SparkStreamingBatchDuration))
+  val timestamp = new DateTime(2001, 9, 8, 21, 46, 40).getMillis
 
-  val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
-  val metricsStream = ssc receiverStream new RandomMetricsReceiver
+  val system = ActorSystem("almanac")
 
-  implicit val rddRepo = new CassandraMetricRDDRepository(sc, schedules)
-  metricsStream aggregateWithSchedule schedules
-  metricsStream window(Seconds(10), Seconds(10)) count() print()
+  val clientActor = system.actorOf(
+    Props(classOf[SparkClientActor], CassandraMetricRDDRepositoryFactory, KafkaChannel), "clientActor"
+  )
 
-  ssc start()
-  ssc awaitTermination()
+  val client = new ActorAlmanacClient(system.actorSelection(clientActor.path))
+
+  client retrieve select("std.impression")
+    .locate(GeoRect("dr5"), 7)
+    .time(HOUR, HOUR(timestamp), HOUR(timestamp) + 3600000)
+    .query foreach println
+
+  for (_ <- 1 to 1000) {
+    println("sending")
+    client record (1 to 10 map (_ => generateRaw): _*)
+    Thread sleep 100
+  }
 }

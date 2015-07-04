@@ -4,7 +4,7 @@ import Keys._
 organization := "almanac"
 name := "almanac"
 version := "0.0.1-SNAPSHOT"
-scalaVersion := "2.11.5"
+scalaVersion := "2.10.5"
 
 isSnapshot := true
 
@@ -23,6 +23,7 @@ libraryDependencies ++= {
     "joda-time"          %  "joda-time"                 % "2.8.1",
     "org.apache.spark"   %% "spark-core"                % sparkVersion,
     "org.apache.spark"   %% "spark-streaming"           % sparkVersion,
+    "org.apache.spark"   %% "spark-streaming-kafka"     % sparkVersion,
     "com.datastax.spark" %% "spark-cassandra-connector" % "1.4.0-M1",
 
     "io.spray"           %% "spray-testkit"             % sprayVersion % Test,

@@ -1,9 +1,10 @@
 package almanac.spark
 
+import almanac.api.MetricRDDRepository
 import almanac.model.Metric._
 import almanac.model.TimeFilter._
 import almanac.model._
-import almanac.persist.MetricRDDRepository
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.{Duration, Minutes}
@@ -30,7 +31,12 @@ trait MetricsAggregator[Source] {
  */
 case class AggregationSchedules(geoPrecisions: List[Int], timeSpans: List[TimeSpan])
 
+trait AlmanacMetrcRDDRepositoryFactory {
+  def apply(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository
+}
+
 object SparkMetricsAggregator {
+
   implicit class RDDMetricsExtension(val source: RDD[Metric]) extends MetricsAggregator[RDD[Metric]]  {
     override def aggregate(func: Key => Key) =
       source map (m => func(m.key) -> m.value) reduceByKey (_+_) map (t => Metric(t._1, t._2))

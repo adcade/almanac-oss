@@ -1,10 +1,10 @@
-package almanac.persist
+package almanac.cassandra
 
 import almanac.AlmanacSettings
+import almanac.api.MetricRDDRepository
 import almanac.model.GeoFilter.WORLDWIDE
 import almanac.model._
-import almanac.persist.CassandraMetricRDDRepository._
-import almanac.spark.AggregationSchedules
+import almanac.spark.{AggregationSchedules, AlmanacMetrcRDDRepositoryFactory}
 import almanac.util.MD5Helper._
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.types._
@@ -67,7 +67,14 @@ object CassandraMetricRDDRepository {
   case class KeyIndex(bucket: String, geohash: String, factkey: String, facts: Map[String, String])
 }
 
+object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFactory {
+  override def apply(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository = {
+    new CassandraMetricRDDRepository(sc, schedules)
+  }
+}
+
 class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSchedules) extends Serializable with MetricRDDRepository {
+  import CassandraMetricRDDRepository._
   TypeConverter.registerConverter(IntToTimeSpanConverter)
   TypeConverter.registerConverter(TimeSpanToIntConverter)
 
