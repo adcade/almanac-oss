@@ -4,11 +4,14 @@ import akka.actor.{ActorSystem, Props}
 import almanac.api.ActorAlmanacClient
 import almanac.cassandra.CassandraMetricRDDRepositoryFactory
 import almanac.kafka.{KafkaChannelFactory, KafkaChannel}
+import almanac.model.Coordinate
 import almanac.model.Criteria.nofact
 import almanac.model.GeoFilter.GlobalFilter
+import almanac.model.Metric._
 import almanac.model.MetricsQuery._
 import almanac.model.TimeFilter.EverFilter
 import almanac.spark.SparkAlmanacActor
+import org.joda.time.DateTime
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -40,12 +43,16 @@ object AlmanacDemo extends App{
 //  }
 //  println(s"sent: $count")
 
+  Thread.sleep(10000)
+  val startTime = System.currentTimeMillis
+
   client retrieve select("std.exit")
-    .where(nofact)
+//    .where(nofact)
     .locate(GlobalFilter)
     .time(EverFilter)
 //    .time(MINUTE, HOUR(timestamp), HOUR(timestamp) + 3600000)
     .query foreach { metrics =>
+      println(s"Query takes ${System.currentTimeMillis - startTime}")
       metrics foreach println
 
       system.shutdown()
