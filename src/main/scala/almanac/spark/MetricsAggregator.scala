@@ -34,7 +34,11 @@ trait DStreamSource[M] {
   def stream(ssc: StreamingContext): DStream[M]
 }
 
-trait MetricRDDRepository {
+trait DStreamSourceFactory[M] {
+  def createSource: DStreamSource[M]
+}
+
+trait MetricRDDRepository extends AutoCloseable{
 
   def save(precision: Int, span: TimeSpan, stream: DStream[Metric]): Unit
   def save(precision: Int, span: TimeSpan, stream: RDD[Metric]): Unit
@@ -48,7 +52,7 @@ trait MetricRDDRepository {
 }
 
 trait AlmanacMetrcRDDRepositoryFactory {
-  def apply(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository
+  def createRepository(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository
 }
 
 /**

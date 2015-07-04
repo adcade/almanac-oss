@@ -105,8 +105,11 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
 
   test("test metrics query of no fact metrics") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
-    repo save metricsRdd
-    repo saveKeys metricsRdd.map(_.key)
+    import almanac.spark.SparkMetricsAggregator._
+    import almanac.spark.MetricsAggregator._
+    val nofactRdd = metricsRdd aggregateMetrics by(Nil)
+    repo save nofactRdd
+    repo saveKeys nofactRdd.map(_.key)
 
     val expected = metrics map (_.key) filter (_.bucket=="std.impression") map {k =>
       Metric.Key(k.bucket, Map(), k.span, k.timestamp, k.geohash)

@@ -68,7 +68,7 @@ object CassandraMetricRDDRepository {
 }
 
 object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFactory {
-  override def apply(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository = {
+  override def createRepository(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository = {
     new CassandraMetricRDDRepository(sc, schedules)
   }
 }
@@ -256,7 +256,9 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
     } else getGeoConditions("")                    // geohash = ""
 
   private def getGeoHashes(geoFilter: GeoFilter): Set[String] = {
-    val precisions = schedules.geoPrecisions.filter(_ <= geoFilter.maxPrecision).toSet
+    val precisions = schedules.geoPrecisions.takeWhile(_ <= geoFilter.maxPrecision).toSet
     geoFilter.rect.geohashes(precisions)
   }
+
+  override def close() = sc.stop()
 }

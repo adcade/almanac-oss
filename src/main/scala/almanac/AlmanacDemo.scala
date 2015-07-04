@@ -3,7 +3,7 @@ package almanac
 import akka.actor.{ActorSystem, Props}
 import almanac.api.ActorAlmanacClient
 import almanac.cassandra.CassandraMetricRDDRepositoryFactory
-import almanac.kafka.KafkaChannel
+import almanac.kafka.{KafkaChannelFactory, KafkaChannel}
 import almanac.model.Criteria.nofact
 import almanac.model.GeoFilter.GlobalFilter
 import almanac.model.MetricsQuery._
@@ -17,7 +17,7 @@ object AlmanacDemo extends App{
   val system = ActorSystem("almanac")
 
   val clientActor = system.actorOf(
-    Props(classOf[SparkAlmanacActor], CassandraMetricRDDRepositoryFactory, new KafkaChannel), "clientActor"
+    Props(classOf[SparkAlmanacActor], CassandraMetricRDDRepositoryFactory, KafkaChannelFactory), "clientActor"
   )
 
   val client = new ActorAlmanacClient(system.actorSelection(clientActor.path))

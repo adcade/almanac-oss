@@ -1,10 +1,10 @@
 package almanac.kafka
 
 import almanac.AlmanacSettings._
-import almanac.api.MetricSink
+import almanac.api.{MetricSinkFactory, MetricSink}
 import almanac.model.Metric
 import almanac.model.Metric.{Key, Value}
-import almanac.spark.DStreamSource
+import almanac.spark.{DStreamSourceFactory, DStreamSource}
 import com.twitter.chill.ScalaKryoInstantiator.defaultPool
 import kafka.producer.{KeyedMessage, Producer}
 import kafka.serializer.{Decoder, Encoder}
@@ -29,6 +29,8 @@ class MetricValueDecoder(verifiableProperties: VerifiableProperties) extends Dec
   override def fromBytes(bytes: Array[Byte]): Value = defaultPool.fromBytes(bytes).asInstanceOf[Value]
 }
 
+
+
 class KafkaChannel extends MetricSink with DStreamSource[Metric] {
   private lazy val producer = new Producer[Key, Value](KafkaProducerConfig)
 
@@ -44,4 +46,12 @@ class KafkaChannel extends MetricSink with DStreamSource[Metric] {
       producer.send(new KeyedMessage[Key, Value](KafkaMetricTopic, m.key, m.value))
     }
   }
+
+  override def close() = producer.close()
 }
+
+object KafkaChannelFactory extends MetricSinkFactory with DStreamSourceFactory[Metric] {
+  override def createSink: KafkaChannel = new KafkaChannel()
+  override def createSource: KafkaChannel = new KafkaChannel()
+}
+

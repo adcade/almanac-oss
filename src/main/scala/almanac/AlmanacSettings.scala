@@ -14,17 +14,11 @@ object AlmanacSettings {
 
   protected val config = rootConfig.getConfig("almanac")
 
-  val SparkMaster: String = config.getString("spark.master")
-
-  val SparkCleanerTtl: Int = config.getInt("spark.cleaner.ttl")
-
   val SparkStreamingBatchDuration: Long = config.getLong("spark.streaming.batch.duration")
 
   val TimeSchedules = immutableSeq(config.getStringList("aggregation.schedule.time")) map (TimeSpan(_)) toList
 
   val GeoSchedules = immutableSeq(config.getIntList("aggregation.schedule.geo")) map(_.intValue) toList
-
-  val CassandraSeed: String = config.getString("cassandra.connection.host")
 
   val CassandraKeyspace = config.getString("cassandra.keyspace")
 
@@ -38,10 +32,10 @@ object AlmanacSettings {
 
   val AlmanacSparkConf = new SparkConf(true)
     .setAppName("almanac")
-    .setMaster(SparkMaster)
-    .set("spark.cassandra.connection.host", CassandraSeed)
+    .setMaster(config.getString("spark.master"))
+    .set("spark.cassandra.connection.host", config.getString("cassandra.connection.host"))
+    .set("spark.cleaner.ttl", config.getInt("spark.cleaner.ttl").toString)
     .set("spark.ui.enabled", config.getBoolean("spark.ui.enabled").toString)
-    .set("spark.cleaner.ttl", SparkCleanerTtl.toString)
 
   val KafkaConsumerParam = Map[String, String](
     "metadata.broker.list" -> kafkaConfig.getString("metadata.broker.list")

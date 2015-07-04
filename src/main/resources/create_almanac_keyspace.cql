@@ -7,14 +7,14 @@ USE almanac;
 DROP TABLE IF EXISTS metrics;
 
 CREATE TABLE metrics (
+    factkey varchar,
     bucket text,
     geohash varchar,
-    factkey varchar,
     span int,
     timestamp timestamp,
     total counter,
     count counter,
-    PRIMARY KEY ((bucket, geohash), span, timestamp, factkey)
+    PRIMARY KEY ((factkey, bucket, geohash), span, timestamp)
 ) WITH CLUSTERING ORDER BY (span DESC, timestamp DESC);
 
 DROP TABLE IF EXISTS facts;
