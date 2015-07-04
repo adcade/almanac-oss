@@ -36,6 +36,6 @@ class MetricSuite extends FunSuite with Matchers {
     val year = month withMonthOfYear 1
     YEAR(raw.getMillis) should be (year.getMillis)
 
-    ALL_TIME(raw.getMillis) should be (0L)
+    EVER(raw.getMillis) should be (0L)
   }
 }

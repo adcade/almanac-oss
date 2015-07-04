@@ -3,7 +3,6 @@ package almanac
 import java.util.Properties
 
 import _root_.kafka.producer.ProducerConfig
-import _root_.kafka.server.KafkaConfig
 import akka.japi.Util.immutableSeq
 import almanac.model.TimeSpan
 import com.typesafe.config.ConfigFactory
@@ -33,7 +32,7 @@ object AlmanacSettings {
 
   val CassandraFactsTable = config.getString("cassandra.table.facts")
 
-  val KafkaBrokers = config.getString("kafka.brokers")
+  val kafkaConfig = config.getConfig("kafka")
 
   val KafkaMetricTopic = config.getString("kafka.topic.metric")
 
@@ -43,21 +42,25 @@ object AlmanacSettings {
     .set("spark.cassandra.connection.host", CassandraSeed)
     .set("spark.cleaner.ttl", SparkCleanerTtl.toString)
 
-  val KafkaConsumerParam = Map[String, String]("metadata.broker.list" -> KafkaBrokers)
+  val KafkaConsumerParam = Map[String, String](
+    "metadata.broker.list" -> kafkaConfig.getString("metadata.broker.list")
+  )
 
-  val KafkaProperties = {
+  val KafkaProducerConfig = {
     val properties = new Properties()
-    val kafkaConfig = config.getConfig("kafka")
 
     Seq(
+      "metadata.broker.list",
       "group.id",
       "zookeeper.connect",
+      "key.serializer.class",
       "serializer.class",
       "partitioner.class",
       "request.required.acks"
-    ) foreach { key => if (kafkaConfig.hasPath(key)) properties.put(key, kafkaConfig.getString(key)) }
+    ) foreach { key =>
+      if (kafkaConfig.hasPath(key)) properties.put(key, kafkaConfig.getString(key))
+    }
 
-    properties.put("metadata.broker.list", KafkaBrokers)
-    properties
+    new ProducerConfig(properties)
   }
 }

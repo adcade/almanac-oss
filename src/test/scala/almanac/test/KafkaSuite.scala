@@ -8,11 +8,10 @@ import org.scalatest.{FunSuite, Matchers}
 
 class KafkaSuite extends FunSuite with Matchers {
   val ssc = new StreamingContext(AlmanacSparkConf, Seconds(2))
-  val kafkaParams = Map[String, String]("metadata.broker.list" -> KafkaBrokers)
 
   test("kafka string test") {
     KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](
-      ssc, kafkaParams, Set(KafkaMetricTopic)).print()
+      ssc, KafkaConsumerParam, Set(KafkaMetricTopic)) print()
 
     ssc.start()
     ssc.awaitTermination()

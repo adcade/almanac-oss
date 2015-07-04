@@ -2,7 +2,8 @@ package almanac.cassandra
 
 import almanac.AlmanacSettings
 import almanac.api.MetricRDDRepository
-import almanac.model.GeoFilter.WORLDWIDE
+import almanac.model.GeoFilter.GlobalFilter
+import almanac.model.TimeFilter.EverFilter
 import almanac.model._
 import almanac.spark.{AggregationSchedules, AlmanacMetrcRDDRepositoryFactory}
 import almanac.util.MD5Helper._
@@ -139,7 +140,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
    * @param geoFilter
    * @return
    */
-  def readFacts(buckets: Set[String], geoFilter: GeoFilter = WORLDWIDE,
+  def readFacts(buckets: Set[String], geoFilter: GeoFilter = GlobalFilter,
                 criteria: Criteria = NonCriteria): RDD[Map[String, String]] =
     readKeys(buckets, geoFilter, criteria) map (_.facts)
 
@@ -217,7 +218,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
   private def getBucketConditions(bucket: String): String = s"${COLUMN_NAMES.BUCKET} = '$bucket'"
 
   private def getTimeCondidtions(filter: TimeFilter): String = all((
-    if (filter == TimeFilter.ALL_TIME)
+    if (filter == EverFilter)
          Seq(s"${COLUMN_NAMES.TIMESTAMP} = 0",                   // timestamp = 0
              s"${COLUMN_NAMES.SPAN} = ${filter.span.index}")     // span = $span.index
 
@@ -234,14 +235,14 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
   private def getGeoConditions(geohash: String) = s"${COLUMN_NAMES.GEOHASH} = '$geohash'"
 
   /**
-   * if not WORLDWIDE get the geohashes of the geo rect by precision
+   * if not GLOBAL get the geohashes of the geo rect by precision
    * else geohash condition is an empty String
    *
    * @param geoFilter
    * @return
    */
   private def getGeoConditions(geoFilter: GeoFilter): String =
-    if (geoFilter == WORLDWIDE) getGeoConditions("") // geohash = ""
+    if (geoFilter == GlobalFilter) getGeoConditions("") // geohash = ""
     else {
       val geohashes = getGeoHashes(geoFilter)
       getGeoConditions(geohashes)

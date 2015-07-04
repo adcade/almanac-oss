@@ -14,5 +14,5 @@ trait MetricRDDRepository {
 
   def read(query: MetricsQuery): RDD[Metric]
 
-  def readFacts(buckets: Set[String], geoFilter: GeoFilter = WORLDWIDE, criteria: Criteria): RDD[Map[String, String]]
+  def readFacts(buckets: Set[String], geoFilter: GeoFilter = GlobalFilter, criteria: Criteria): RDD[Map[String, String]]
 }

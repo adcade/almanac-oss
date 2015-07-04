@@ -9,10 +9,10 @@ object GeoHash {
   val LAT_RANGE = (-90.0, 90.0)
   val LNG_RANGE = (-180.0, 180.0)
 
-  val WORLDWIDE = 0
+  val GLOBAL = 0
   val MAX_PRECISION = 12
 
-  lazy val ALL_PRECISION = WORLDWIDE to MAX_PRECISION toSet
+  lazy val ALL_PRECISION = GLOBAL to MAX_PRECISION toSet
 
   implicit class CoordinateWrapper(x: Double) {
     def in(b: Bounds): Boolean = x >= b._1 && x <= b._2

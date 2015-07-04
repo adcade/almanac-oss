@@ -1,10 +1,13 @@
 package almanac.model
 
 import java.util.Date
+import almanac.model.GeoFilter.GlobalFilter
 import almanac.model.GeoHash._
+import almanac.model.TimeFilter.EverFilter
+import almanac.model.TimeSpan.EVER
 
 object TimeFilter {
-  val ALL_TIME: TimeFilter = new TimeFilter(TimeSpan.ALL_TIME, 0, 0)
+  val EverFilter: TimeFilter = new TimeFilter(EVER, 0, 0)
 }
 
 /**
@@ -15,12 +18,12 @@ object TimeFilter {
  */
 case class TimeFilter(span: TimeSpan, fromTime: Long, toTime: Long) {
   override def toString: String =
-    if (this == TimeFilter.ALL_TIME) "ALL TIME"
+    if (this == EverFilter) "EVER"
     else "%s\n  FROM %s\n  TO   %s" format (span, new Date(fromTime), new Date(toTime))
 }
 
 object GeoFilter {
-  val WORLDWIDE: GeoFilter = new GeoFilter(GeoRect(LAT_RANGE, LNG_RANGE), GeoHash.WORLDWIDE)
+  val GlobalFilter: GeoFilter = new GeoFilter(GeoRect(LAT_RANGE, LNG_RANGE), GeoHash.GLOBAL)
 
   def apply(geohash: String, maxPrecision: Int = MAX_PRECISION): GeoFilter = {
     GeoFilter(GeoRect(geohash), maxPrecision)
@@ -34,7 +37,7 @@ object GeoFilter {
  */
 case class GeoFilter(rect: GeoRect, maxPrecision: Int) {
   override def toString: String =
-    if (this == GeoFilter.WORLDWIDE) "WORLDWIDE"
+    if (this == GlobalFilter) "GLOBAL"
     else "rect %s max %s" format (rect, maxPrecision)
 }
 
@@ -196,5 +199,5 @@ object MetricsQuery {
    * @param buckets
    * @return
    */
-  def select(buckets: String*) = Builder(Set(buckets: _*), NonCriteria, Seq(), Seq(), GeoFilter.WORLDWIDE, TimeFilter.ALL_TIME, NO_LIMIT, 0)
+  def select(buckets: String*) = Builder(Set(buckets: _*), NonCriteria, Seq(), Seq(), GlobalFilter, EverFilter, NO_LIMIT, 0)
 }

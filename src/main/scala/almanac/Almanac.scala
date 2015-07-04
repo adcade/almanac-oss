@@ -5,6 +5,7 @@ import almanac.kafka.KafkaChannel
 import almanac.spark.SparkAlmanacEngine
 
 object Almanac extends App {
-  val engine = new SparkAlmanacEngine(CassandraMetricRDDRepositoryFactory, KafkaChannel)
+  val engine = new SparkAlmanacEngine(createRepo = CassandraMetricRDDRepositoryFactory,
+                                      channel = KafkaChannel)
   engine.start()
 }

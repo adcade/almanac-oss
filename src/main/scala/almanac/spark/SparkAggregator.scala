@@ -3,6 +3,7 @@ package almanac.spark
 import almanac.api.MetricRDDRepository
 import almanac.model.Metric._
 import almanac.model.TimeFilter._
+import almanac.model.TimeSpan.EVER
 import almanac.model._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -80,28 +81,26 @@ object SparkMetricsAggregator {
 
     private def keyProcess(stream: DStream[Metric], precision: Int, span: TimeSpan)
                               (implicit repo: MetricRDDRepository) =
-      repo.saveKeys(
-        stream.window(Minutes(1), Minutes(1))
-          .aggregateByTimeSpan(ALL_TIME.span)
-          .map(_.key))
+      // TODO: configuration of window span
+      repo.saveKeys(stream window(Minutes(1), Minutes(1)) aggregateByTimeSpan EVER map (_.key))
 
     /**
      * aggregate the first timeSchedule to the intial stream
      * then aggregate on each level of timeSchedules and geoSchedules like below:
      *
-     * Seq(HOUR, DAY, ALL_TIME) Seq(8, 4, WORLDWIDE)
+     * Seq(HOUR, DAY, EVER) Seq(8, 4, GLOBAL)
      *
      * in this case HOUR is the intial time span level for aggregation
      *
-     * 12, RAW -> initial stream -> 8, HOUR -> DAY -> ALL_TIME
+     * 12, RAW -> initial stream -> 8, HOUR -> DAY -> EVER
      *                                 |
      *                                 V
-     *                              4, HOUR -> DAY -> ALL_TIME
+     *                              4, HOUR -> DAY -> EVER
      *                                 |
      *                                 V
-     *                      WORLDWIDE, HOUR -> DAY -> ALL_TIME
+     *                         GLOBAL, HOUR -> DAY -> EVER
      *
-     * the return value is the last aggregated stream in the above case: WORLDWIDE / ALL_TIME
+     * the return value is the last aggregated stream in the above case: GLOBAL / EVER
      * @param repo the stream to be aggregated
      * @param schedules
      * @return the stream of the last aggregated stream
@@ -123,5 +122,5 @@ object SparkMetricsAggregator {
     }
   }
 
-  val defaultSchedules = AggregationSchedules(List(GeoHash.WORLDWIDE), List(TimeSpan.ALL_TIME))
+  val defaultSchedules = AggregationSchedules(List(GeoHash.GLOBAL), List(TimeSpan.EVER))
 }

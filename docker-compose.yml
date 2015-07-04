@@ -1,5 +1,5 @@
 #almanac:
-#  image: almanac:1.0-snapshot
+#  build: .
 #  links:
 #   - cassandra
 #   - kafka

@@ -25,7 +25,7 @@ case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, ti
    * the the datetime of this metrics formated by the span
    * @return the datetime string
    */
-  def dateStr = if (span == ALL_TIME) "" else span.dateFormat.format(new Date(timestamp))
+  def dateStr = if (span == EVER) "" else span.dateFormat.format(new Date(timestamp))
 
   override def toString = f"Metric($bucket,$facts,$span($dateStr),$geohash,$total/$count)"
 }
@@ -188,7 +188,7 @@ sealed abstract class TimeSpan(val strip: Strip, val dateFormatPattern: String =
    * @return
    */
   def apply(timestamp: Long): Long = {
-    if (this == ALL_TIME) 0L
+    if (this == EVER) 0L
     else (SECOND.index to this.index foldLeft new DateTime(timestamp, UTC)) {
       (datetime, i) => values(i).strip(datetime)
     }.getMillis
@@ -205,7 +205,7 @@ object TimeSpan {
    */
   private type Strip = (DateTime) => (DateTime)
 
-  case object ALL_TIME  extends TimeSpan(_ withMillis 0)
+  case object EVER  extends TimeSpan(_ withMillis 0)
   case object RAW       extends TimeSpan(x => x, "yyyy/MM/dd HH:mm:ss.S")
   case object SECOND    extends TimeSpan(_ withMillisOfSecond 0, "yyyy/MM/dd HH:mm:ss")
   case object MINUTE    extends TimeSpan(_ withSecondOfMinute 0, "yyyy/MM/dd HH:mm")
@@ -214,7 +214,7 @@ object TimeSpan {
   case object MONTH     extends TimeSpan(_ withDayOfMonth 1, "yyyy/MM")
   case object YEAR      extends TimeSpan(_ withMonthOfYear 1)
 
-  private lazy val values: Seq[TimeSpan with Product] = Seq(ALL_TIME, RAW, SECOND, MINUTE, HOUR, DAY, MONTH, YEAR)
+  private lazy val values: Seq[TimeSpan with Product] = Seq(EVER, RAW, SECOND, MINUTE, HOUR, DAY, MONTH, YEAR)
 
   /**
    * for convert from index to TimeSpan, just do `TimeSpan(index)`
