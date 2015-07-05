@@ -1,5 +1,6 @@
 package almanac.test
 
+import almanac.AlmanacSettings._
 import almanac.cassandra.CassandraMetricRDDRepository
 import almanac.cassandra.CassandraMetricRDDRepository.KeyIndex
 import almanac.model.Criteria._
@@ -10,6 +11,8 @@ import almanac.model._
 import almanac.spark.AggregationSchedules
 import almanac.test.TestUtils.{avg, time}
 import almanac.util.MD5Helper._
+import com.datastax.spark.connector.cql.CassandraConnector
+import com.sun.java.swing.plaf.windows.resources.windows
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
@@ -23,9 +26,9 @@ import scala.concurrent.{Await, Future}
 
 class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
 
-  val conf = new SparkConf().setAppName("almanac")
+  val conf = new SparkConf().setAppName("almanac").setMaster("local[2]")
     .set("spark.cassandra.connection.host", "dev")
-  val sc = new SparkContext("local[4]", "test", conf)
+  val sc = SparkContext getOrCreate conf
   val ssc = new StreamingContext(sc, Milliseconds(100))
   val schedules = AggregationSchedules(List(4), List(HOUR))
 
@@ -61,6 +64,10 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
   }
 
   test("test facts with geo rdd") {
+    CassandraConnector(sc.getConf) withSessionDo { session =>
+      session.execute("use almanac;")
+      session.execute("truncate facts;")
+    }
     val repo = new CassandraMetricRDDRepository(sc, schedules)
 
     repo saveKeys metricsRdd.map(_.key)
@@ -76,11 +83,19 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
   }
 
   test("test facts rdd") {
+    CassandraConnector(sc.getConf) withSessionDo { session =>
+      session.execute("use almanac;")
+      session.execute("truncate facts;")
+    }
     val repo = new CassandraMetricRDDRepository(sc, schedules)
 
     repo saveKeys metricsRdd.map(_.key)
 
-    repo readFacts Set("std.impression", "std.exit") collect() foreach println
+    val facts = repo readFacts(Set("std.impression", "std.exit"), GeoFilter("dr5")) collect()
+    facts should contain theSameElementsAs Seq(Map("device" -> "pc", "os" -> "windows"),
+                                               Map("device" -> "mobile", "os" -> "osx"),
+                                               Map("device" -> "mobile", "os" -> "osx"),
+                                               Map("device" -> "pc", "os" -> "windows"))
   }
 
   test("test metrics query") {
@@ -113,7 +128,7 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
 
     val expected = metrics map (_.key) filter (_.bucket=="std.impression") map {k =>
       Metric.Key(k.bucket, Map(), k.span, k.timestamp, k.geohash)
-    } toSet
+    }
 
     val query = select("std.impression")
       .where(nofact)
@@ -129,7 +144,7 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
 
     // FIXME: the result seems to be wrong! we didn't save any no fact metrics!!!
     // TODO: this is even slower than the join version
-    result map(_.key) should contain theSameElementsAs (expected)
+    result map(_.key) should contain theSameElementsAs expected
   }
 
   test ("performance") {
@@ -140,11 +155,11 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with Matchers {
       .time(HOUR, HOUR(timestamp), HOUR(timestamp) + 3600000)
       .query) collect()
 
-    val num = 10000
+    val num = 1000
 
     def printAvg(allTime: Seq[Long]) = println(s"Elapsed time: ${avg(allTime)} ms")
 
-    printAvg(Await.result( Future.sequence(1 to num map (_=> Future { time { work } } )), 1 hour))
     printAvg(1 to num map (_=> time { work }))
+    printAvg(Await.result( Future.sequence(1 to num map (_=> Future { time { work } } )), 1 hour span))
   }
 }

@@ -4,9 +4,7 @@ CREATE KEYSPACE IF NOT EXISTS almanac WITH REPLICATION = {
 
 USE almanac;
 
-DROP TABLE IF EXISTS metrics;
-
-CREATE TABLE metrics (
+CREATE TABLE IF NOT EXISTS metrics (
     factkey varchar,
     bucket text,
     geohash varchar,
@@ -17,9 +15,7 @@ CREATE TABLE metrics (
     PRIMARY KEY ((factkey, bucket, geohash), span, timestamp)
 ) WITH CLUSTERING ORDER BY (span DESC, timestamp DESC);
 
-DROP TABLE IF EXISTS facts;
-
-CREATE TABLE facts (
+CREATE TABLE IF NOT EXISTS facts (
     bucket text,
     geohash varchar,
     factkey varchar,

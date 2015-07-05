@@ -1,14 +1,19 @@
 package almanac.kafka
 
+import java.util.Properties
+
 import almanac.AlmanacSettings._
-import almanac.api.{MetricSinkFactory, MetricSink}
+import almanac.api.{MetricSink, MetricSinkFactory}
 import almanac.model.Metric
 import almanac.model.Metric.{Key, Value}
-import almanac.spark.{DStreamSourceFactory, DStreamSource}
+import almanac.spark.{DStreamSource, DStreamSourceFactory}
 import com.twitter.chill.ScalaKryoInstantiator.defaultPool
-import kafka.producer.{KeyedMessage, Producer}
+import kafka.admin.AdminUtils._
+import kafka.producer.{KeyedMessage, Producer, ProducerConfig}
 import kafka.serializer.{Decoder, Encoder}
-import kafka.utils.VerifiableProperties
+import kafka.utils.{VerifiableProperties, ZKStringSerializer}
+import org.I0Itec.zkclient.ZkClient
+import org.I0Itec.zkclient.serialize.ZkSerializer
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.kafka.KafkaUtils._
@@ -29,13 +34,22 @@ class MetricValueDecoder(verifiableProperties: VerifiableProperties) extends Dec
   override def fromBytes(bytes: Array[Byte]): Value = defaultPool.fromBytes(bytes).asInstanceOf[Value]
 }
 
-
-
 class KafkaChannel extends MetricSink with DStreamSource[Metric] {
-  private lazy val producer = new Producer[Key, Value](KafkaProducerConfig)
+  private lazy val producer = new Producer[Key, Value](new ProducerConfig(KafkaProducerProperties))
+  val zkClient = ZookeeperUtils.createClient()
+
+  createTopicIfNotExists(KafkaMetricTopic, KafkaMetricTopicPartitionNum, KafkaMetricTopicReplicationFactor)
+
+  def createTopicIfNotExists(topic: String, partitionNum: Int = 1, replicationFactor: Int = 1,
+                             config: Properties = new Properties()): Unit = {
+    if (! topicExists(zkClient, topic)) {
+      createTopic(zkClient, topic, partitionNum, replicationFactor, config)
+      println("created")
+    }
+  }
 
   def stream(ssc: StreamingContext): DStream[Metric] = {
-    // TODO: decoder and offset
+    // TODO: check offset?
     createDirectStream [Key, Value, MetricKeyDecoder, MetricValueDecoder] (ssc,
       kafkaParams = KafkaConsumerParam,
       topics = Set(KafkaMetricTopic)) map { case (k,v) => Metric(k, v) }
@@ -47,7 +61,10 @@ class KafkaChannel extends MetricSink with DStreamSource[Metric] {
     }
   }
 
-  override def close() = producer.close()
+  override def close() = {
+    zkClient.close()
+    producer.close()
+  }
 }
 
 object KafkaChannelFactory extends MetricSinkFactory with DStreamSourceFactory[Metric] {
@@ -55,3 +72,12 @@ object KafkaChannelFactory extends MetricSinkFactory with DStreamSourceFactory[M
   override def createSource: KafkaChannel = new KafkaChannel()
 }
 
+object ZookeeperUtils {
+  def createClient(config: Properties = KafkaProducerProperties,
+                   sessTimeout: Int = 10000,
+                   connTimeout: Int = 10000,
+                   serializer: ZkSerializer = ZKStringSerializer): ZkClient = {
+    val host = config.getProperty("zookeeper.connect")
+    new ZkClient(host, sessTimeout, connTimeout, serializer)
+  }
+}

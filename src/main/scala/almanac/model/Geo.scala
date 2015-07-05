@@ -11,7 +11,7 @@ object GeoHash {
   val GLOBAL = 0
   val MAX_PRECISION = 12
 
-  lazy val ALL_PRECISION = GLOBAL to MAX_PRECISION toSet
+  lazy val ALL_PRECISION = (GLOBAL to MAX_PRECISION).toSet
 
   implicit class CoordinateWrapper(x: Double) {
     def in(b: Bounds): Boolean = x >= b._1 && x <= b._2
@@ -58,7 +58,7 @@ object GeoHash {
    */
   def toBounds(geohash: String): (Bounds, Bounds) = {
     def charToInt(ch: Char) = BASE32.indexOf(ch)
-    def intToBits(i: Int) = 4 to 0 by -1 map (i >> _ & 1) map (1==)
+    def intToBits(i: Int) = 4 to 0 by -1 map (i >> _ & 1) map (_==1)
     def split[T](l: List[T]) = (l :\ (List[T](), List[T]())) { case (b, (list1, list2)) => (b :: list2, list1) }
     def fromBits(bits: List[Boolean], bounds: Bounds): Bounds = (bounds /: bits ) {
       case ((min, max), bool) =>
@@ -66,7 +66,7 @@ object GeoHash {
         else      (min, (min+max)/2)
     }
 
-    val (lngBits, latBits) = split(geohash map charToInt flatMap intToBits toList)
+    val (lngBits, latBits) = split((geohash map charToInt flatMap intToBits).toList)
     (fromBits(latBits, LAT_RANGE), fromBits(lngBits, LNG_RANGE))
   }
 
@@ -112,9 +112,9 @@ object GeoHash {
     val numBits = precision * 5 / 2
     val latBits = toBits(lat, LAT_RANGE, numBits)
     val lngBits = toBits(lng, LNG_RANGE, numBits + precision % 2)
-    interleave(lngBits, latBits) grouped(5) map { x =>
+    (interleave(lngBits, latBits) grouped(5) map { x =>
       BASE32(x reduceLeft { (acc, b) => (acc << 1) + b})
-    } mkString
+    }).mkString
   }
 
   implicit class GeoHashHelper(geohash: String) {
@@ -130,7 +130,7 @@ object GeoHash {
       val delta = targetPrecision - geohash.length
       val sb = new StringBuilder(geohash)
       if (delta <= 0) sb.substring(0, targetPrecision)
-      else ((sb append "s") /: (1 until delta)) { (sb, _) => sb append "0" } toString
+      else ((sb append "s") /: (1 until delta)) { (sb, _) => sb append "0" }.toString
     }
 
     /**
@@ -255,7 +255,7 @@ trait Shape {
     }
 
     if (precisions.isEmpty) Set.empty[String]
-    else next("") toSet
+    else next("").toSet
   }
 }
 

@@ -98,14 +98,14 @@ class GeoSuite extends FunSuite with Matchers {
     superGeohash("g", Set(7, 5, 2, 0)) should be (Some(""))
 
     subGeohashes("gehs") should be (Seq("gehs"))
-    subGeohashes("gehs", Set(7, 5, 2, 0)).toSet should be ((for (i <- BASE32) yield s"gehs$i") toSet)
+    subGeohashes("gehs", Set(7, 5, 2, 0)).toSet should be ((for (i <- BASE32) yield s"gehs$i").toSet)
     subGeohashes("gehs", Set(2, 0)) should be (Nil)
-    subGeohashes("", Set(2)).toSet should be ((for (i <- BASE32; j <- BASE32) yield s"$i$j") toSet)
+    subGeohashes("", Set(2)).toSet should be ((for (i <- BASE32; j <- BASE32) yield s"$i$j").toSet)
   }
   test ("rectangle geohashes test") {
     GeoRect("c4").geohashes(Set.empty[Int]) should be (Set())
     GeoRect("c4").geohashes(Set(0)) should be (Set(""))
-    GeoRect("gehs").geohashes(Set(7, 5, 2, 0)) should be ((for (i <- BASE32) yield s"gehs$i") toSet)
+    GeoRect("gehs").geohashes(Set(7, 5, 2, 0)) should be ((for (i <- BASE32) yield s"gehs$i").toSet)
     GeoRect("c4").geohashes(Set(1)) should be (Set("c"))
     GeoRect("c4").geohashes(Set(1, 2, 4)) should be (Set("c4"))
 

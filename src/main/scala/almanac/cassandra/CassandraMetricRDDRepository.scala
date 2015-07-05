@@ -1,17 +1,24 @@
 package almanac.cassandra
 
+import java.io.InputStream
+
 import almanac.AlmanacSettings
+import almanac.AlmanacSettings.CassandraCreationScriptPath
 import almanac.model.GeoFilter.GlobalFilter
 import almanac.model.TimeFilter.EverFilter
 import almanac.model._
-import almanac.spark.{MetricRDDRepository, AggregationSchedules, AlmanacMetrcRDDRepositoryFactory}
+import almanac.spark.{AggregationSchedules, AlmanacMetrcRDDRepositoryFactory, MetricRDDRepository}
 import almanac.util.MD5Helper._
+import com.datastax.driver.core.Session
 import com.datastax.spark.connector._
+import com.datastax.spark.connector.cql.CassandraConnector
 import com.datastax.spark.connector.types._
-import org.apache.spark.SparkContext
+import org.apache.spark.{metrics, SparkContext}
+import org.apache.spark.metrics.source
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
 
+import scala.io.Source._
 import scala.reflect.runtime.universe._
 
 object CassandraMetricRDDRepository {
@@ -68,6 +75,8 @@ object CassandraMetricRDDRepository {
 }
 
 object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFactory {
+
+
   override def createRepository(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository = {
     new CassandraMetricRDDRepository(sc, schedules)
   }
@@ -77,6 +86,24 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
   import CassandraMetricRDDRepository._
   TypeConverter.registerConverter(IntToTimeSpanConverter)
   TypeConverter.registerConverter(TimeSpanToIntConverter)
+
+  val conf = sc.getConf
+
+  // create the table
+  CassandraConnector(conf) withSessionDo { session =>
+    val inputStream = getClass.getClassLoader getResourceAsStream CassandraCreationScriptPath
+    runScript(inputStream, session)
+  }
+
+  def runScript(inputStream: InputStream, session: Session) = {
+    val script = fromInputStream(inputStream)
+    try for { statementNoSemicolon <- script.mkString.split(";")
+              if !statementNoSemicolon.trim.isEmpty }
+      session.execute(s"${statementNoSemicolon};")
+    finally {
+      script.close()
+    }
+  }
 
   /**
    *
@@ -172,7 +199,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
       geohash <- getGeoHashes(query.geoFilter)
     } yield KeyIndex(bucket, geohash, FACTKEY_OF_EMPTY, Map())
 
-    val keyIndice = sc.parallelize(partitionKeys toSeq).repartitionByCassandraReplica(KEYSPACE, METRICS_TABLE)
+    val keyIndice = sc.parallelize(partitionKeys.toSeq).repartitionByCassandraReplica(KEYSPACE, METRICS_TABLE)
 
     joinRead(keyIndice, query.timeFilter)
   }

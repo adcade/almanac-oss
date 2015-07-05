@@ -2,7 +2,6 @@ package almanac
 
 import java.util.Properties
 
-import _root_.kafka.producer.ProducerConfig
 import akka.japi.Util.immutableSeq
 import almanac.model.TimeSpan
 import com.typesafe.config.ConfigFactory
@@ -16,11 +15,13 @@ object AlmanacSettings {
 
   val SparkStreamingBatchDuration: Long = config.getLong("spark.streaming.batch.duration")
 
-  val TimeSchedules = immutableSeq(config.getStringList("aggregation.schedule.time")) map (TimeSpan(_)) toList
+  val TimeSchedules = immutableSeq(config.getStringList("aggregation.schedule.time")).map(TimeSpan(_)).toList
 
-  val GeoSchedules = immutableSeq(config.getIntList("aggregation.schedule.geo")) map(_.intValue) toList
+  val GeoSchedules = immutableSeq(config.getIntList("aggregation.schedule.geo")).map(_.intValue).toList
 
   val CassandraKeyspace = config.getString("cassandra.keyspace")
+
+  val CassandraCreationScriptPath = config.getString("cassandra.script.creation.path")
 
   val CassandraMetricsTable = config.getString("cassandra.table.metrics")
 
@@ -28,7 +29,9 @@ object AlmanacSettings {
 
   val kafkaConfig = config.getConfig("kafka")
 
-  val KafkaMetricTopic = config.getString("kafka.topic.metric")
+  val KafkaMetricTopic = config.getString("kafka.topic.metric.name")
+  val KafkaMetricTopicPartitionNum = config.getInt("kafka.topic.metric.partition.num")
+  val KafkaMetricTopicReplicationFactor = config.getInt("kafka.topic.metric.replication.factor")
 
   val AlmanacSparkConf = new SparkConf(true)
     .setAppName("almanac")
@@ -41,7 +44,7 @@ object AlmanacSettings {
     "metadata.broker.list" -> kafkaConfig.getString("metadata.broker.list")
   )
 
-  val KafkaProducerConfig = {
+  val KafkaProducerProperties = {
     val properties = new Properties()
 
     Seq(
@@ -56,6 +59,6 @@ object AlmanacSettings {
       if (kafkaConfig.hasPath(key)) properties.put(key, kafkaConfig.getString(key))
     }
 
-    new ProducerConfig(properties)
+    properties
   }
 }

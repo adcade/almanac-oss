@@ -224,7 +224,7 @@ object TimeSpan {
    */
   def apply(index: Int) = values(index)
 
-  private lazy val lookup: Map[String, TimeSpan] = values map (s => s.toString -> s) toMap
+  private lazy val lookup: Map[String, TimeSpan] = (values map (s => s.toString -> s)).toMap
 
   /**
    * for convert from name String to TimeSpan, just do `TimeSpan(name)`

@@ -1,5 +1,6 @@
+import com.typesafe.sbt.packager.docker.DockerPlugin
+import sbt.Keys._
 import sbt._
-import Keys._
 
 organization := "almanac"
 name := "almanac"
@@ -36,20 +37,22 @@ libraryDependencies ++= {
   )
 }
 
+enablePlugins(JavaAppPackaging)
+
+mainClass in Compile := Some("almanac.Almanac")
+
 scalacOptions ++= Seq(
-  "-unchecked",
-  "-deprecation",
-  "-Xlint",
-  "-Ywarn-dead-code",
-  "-language:_",
+  "-feature",
   "-target:jvm-1.7",
   "-encoding", "UTF-8"
 )
 
 fork in run := true
-
 crossPaths := false
-
 parallelExecution in Test := false
 
-assemblyJarName in assembly := "almanac.jar"
+enablePlugins(DockerPlugin)
+
+dockerBaseImage := "java:7"
+
+dockerExposedPorts := Seq(8080)

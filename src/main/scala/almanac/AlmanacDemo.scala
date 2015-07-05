@@ -19,31 +19,12 @@ object AlmanacDemo extends App{
 
   val system = ActorSystem("almanac")
 
-  val clientActor = system.actorOf(
-    Props(classOf[SparkAlmanacActor], CassandraMetricRDDRepositoryFactory, KafkaChannelFactory), "clientActor"
-  )
+  val clientActor = system.actorOf(SparkAlmanacActor.props, "clientActor")
 
   val client = new ActorAlmanacClient(system.actorSelection(clientActor.path))
 
-  val timestamp = System.currentTimeMillis()
+//  generateMetrics()
 
-//  var count = 0
-//  for (_ <- 1 to 1000) {
-//    val t0 = System.currentTimeMillis
-//    client record (1 to 100 map {_ =>
-//      val m = metric
-//        .locate(Coordinate("dr5ru7k3"))
-//        .at(new DateTime(2015, 7, 4, 11, 20, 30).getMillis)
-//        .increment("std.exit")
-//      count += 1
-//      println(s"$m")
-//      m
-//    }: _*)
-////    Thread sleep (t0 + 10 - System.currentTimeMillis)
-//  }
-//  println(s"sent: $count")
-
-  Thread.sleep(10000)
   val startTime = System.currentTimeMillis
 
   client retrieve select("std.exit")
@@ -59,5 +40,24 @@ object AlmanacDemo extends App{
       system.awaitTermination()
       println("done")
     }
+
+  def generateMetrics() = {
+
+    var count = 0
+    for (_ <- 1 to 1000) {
+      val t0 = System.currentTimeMillis
+      client record (1 to 100 map {_ =>
+        val m = metric
+          .locate(Coordinate("dr5ru7k3"))
+          .at(new DateTime(2015, 7, 4, 11, 20, 30).getMillis)
+          .increment("std.exit")
+        count += 1
+        println(s"$m")
+        m
+      }: _*)
+      //    Thread sleep (t0 + 10 - System.currentTimeMillis)
+    }
+    println(s"sent: $count")
+  }
 
 }

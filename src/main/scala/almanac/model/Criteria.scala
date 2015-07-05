@@ -8,8 +8,8 @@ sealed trait Criteria {
 
 object Criteria {
   private[model] case class FactCriteriaBuilder(fact: String) {
-    def in(ref: String*) = In(fact, ref toSet)
-    def notIn(ref: String*) = NotIn(fact, ref toSet)
+    def in(ref: String*) = In(fact, ref.toSet)
+    def notIn(ref: String*) = NotIn(fact, ref.toSet)
     def is(ref: String) = Is(fact, ref)
     def isNot(ref: String) = IsNot(fact, ref)
     def like(regex: String) = Like(fact, regex)

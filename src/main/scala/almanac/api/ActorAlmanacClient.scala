@@ -11,7 +11,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class ActorAlmanacClient(almanacActor: ActorSelection) extends AlmanacService {
-  implicit val timeout = Timeout(10 seconds)
+  implicit val timeout = Timeout(10 seconds span)
 
   override def createSpace(space: String): Unit = ???
 
