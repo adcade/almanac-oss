@@ -13,7 +13,7 @@ import com.datastax.driver.core.Session
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.datastax.spark.connector.types._
-import org.apache.spark.SparkContext
+import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
 
@@ -81,18 +81,34 @@ object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFact
   }
 }
 
-class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSchedules) extends Serializable with MetricRDDRepository {
+class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSchedules)
+  extends Serializable with MetricRDDRepository with Logging {
+
   import CassandraMetricRDDRepository._
+
   TypeConverter.registerConverter(IntToTimeSpanConverter)
   TypeConverter.registerConverter(TimeSpanToIntConverter)
 
   val conf = sc.getConf
 
-  // create the table
-  CassandraConnector(conf) withSessionDo { session =>
+  // FIXME: in a more elegant way
+  var connected = false
+  while (connected) {
+    try {
+      createTable()
+      connected = true
+    } catch {
+      case e: java.io.IOException => log.warn(s"Failed to connect to cassandra, will retry in 5 sec")
+    }
+
+    Thread sleep 5000
+  }
+
+  def createTable(): Unit = CassandraConnector(conf) withSessionDo { session =>
     val inputStream = getClass.getClassLoader getResourceAsStream CassandraCreationScriptPath
     runScript(inputStream, session)
   }
+
 
   def runScript(inputStream: InputStream, session: Session) = {
     val script = fromInputStream(inputStream)
