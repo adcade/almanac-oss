@@ -10,16 +10,16 @@ import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
 
 class SparkAlmanacEngine(repoFactory: AlmanacMetrcRDDRepositoryFactory,
                          streamFactory: DStreamSourceFactory[Metric],
-                         sc: SparkContext = AlmanacGlobalSparkContext) extends Runnable {
+                         sparkContext: SparkContext) extends Runnable {
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
 
   // FIXME: checkpointPath
   val ssc = StreamingContext getActiveOrCreate createStreamingContext
-  implicit val repo = repoFactory.createRepository(schedules)(ssc.sparkContext)
+  implicit val repo = repoFactory.createRepository(schedules)(sparkContext)
   streamFactory.createSource.stream(ssc) aggregateWithSchedule schedules stats Seconds(10)
 
   private def createStreamingContext(): StreamingContext =
-    new StreamingContext(sc, Milliseconds(SparkStreamingBatchDuration))
+    new StreamingContext(sparkContext, Milliseconds(SparkStreamingBatchDuration))
 
   override def run() = {
     ssc.start()

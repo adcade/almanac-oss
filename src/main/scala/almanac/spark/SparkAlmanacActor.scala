@@ -13,17 +13,17 @@ import org.apache.spark.metrics.sink
 import org.apache.spark.{Logging, SparkContext}
 
 object SparkAlmanacActor {
-  def props: Props = {
-    Props(classOf[SparkAlmanacActor], CassandraMetricRDDRepositoryFactory, KafkaChannelFactory)
+  def props(sparkContext: SparkContext): Props = {
+    Props(classOf[SparkAlmanacActor], CassandraMetricRDDRepositoryFactory, KafkaChannelFactory, sparkContext)
   }
 }
 
-class SparkAlmanacActor(repoFactory: AlmanacMetrcRDDRepositoryFactory,
-                        sinkFactory: MetricSinkFactory) extends Actor with Logging {
+class SparkAlmanacActor(val repoFactory: AlmanacMetrcRDDRepositoryFactory,
+                        val sinkFactory: MetricSinkFactory,
+                        implicit val sparkContext: SparkContext) extends Actor with Logging {
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
 
   // FIXME: global SparkContext
-  implicit val sc = AlmanacGlobalSparkContext
   implicit val repo = repoFactory.createRepository(schedules)
   val sink = sinkFactory.createSink
 
@@ -46,7 +46,7 @@ class SparkAlmanacActor(repoFactory: AlmanacMetrcRDDRepositoryFactory,
   }
 
   override def postStop(): Unit = {
-    sc.stop()
+    sparkContext.stop()
     sink.close()
   }
 }

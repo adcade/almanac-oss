@@ -68,11 +68,11 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with BeforeAndAfterAll 
   }
 
   test("test facts with geo rdd") {
+    val repo = new CassandraMetricRDDRepository(sc, schedules)
     CassandraConnector(sc.getConf) withSessionDo { session =>
       session.execute("use almanac;")
       session.execute("truncate facts;")
     }
-    val repo = new CassandraMetricRDDRepository(sc, schedules)
 
     repo saveKeys metricsRdd.map(_.key)
 
@@ -87,11 +87,11 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with BeforeAndAfterAll 
   }
 
   test("test facts rdd") {
+    val repo = new CassandraMetricRDDRepository(sc, schedules)
     CassandraConnector(sc.getConf) withSessionDo { session =>
       session.execute("use almanac;")
       session.execute("truncate facts;")
     }
-    val repo = new CassandraMetricRDDRepository(sc, schedules)
 
     repo saveKeys metricsRdd.map(_.key)
 

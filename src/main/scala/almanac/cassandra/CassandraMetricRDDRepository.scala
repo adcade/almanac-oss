@@ -9,16 +9,21 @@ import almanac.model.TimeFilter.EverFilter
 import almanac.model._
 import almanac.spark.{AggregationSchedules, AlmanacMetrcRDDRepositoryFactory, MetricRDDRepository}
 import almanac.util.MD5Helper._
+import almanac.util.RetryHelper._
 import com.datastax.driver.core.Session
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.datastax.spark.connector.types._
-import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.{SparkConf, Logging, SparkContext}
 
+import scala.concurrent.{Future, Await}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.io.Source._
 import scala.reflect.runtime.universe._
+
 
 object CassandraMetricRDDRepository {
   object IntToTimeSpanConverter extends TypeConverter[TimeSpan] {
@@ -75,6 +80,21 @@ object CassandraMetricRDDRepository {
 
 object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFactory {
 
+  def createTable(conf: SparkConf): Unit = CassandraConnector(conf) withSessionDo { session =>
+    val inputStream = getClass.getClassLoader getResourceAsStream CassandraCreationScriptPath
+    runScript(inputStream, session)
+  }
+
+  def runScript(inputStream: InputStream, session: Session) = {
+    val script = fromInputStream(inputStream)
+    try for { statementNoSemicolon <- script.mkString.split(";")
+              if !statementNoSemicolon.trim.isEmpty }
+      session.execute(s"${statementNoSemicolon};")
+    finally {
+      script.close()
+    }
+  }
+
 
   override def createRepository(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository = {
     new CassandraMetricRDDRepository(sc, schedules)
@@ -88,37 +108,6 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
 
   TypeConverter.registerConverter(IntToTimeSpanConverter)
   TypeConverter.registerConverter(TimeSpanToIntConverter)
-
-  val conf = sc.getConf
-
-  // FIXME: in a more elegant way
-  var connected = false
-  while (connected) {
-    try {
-      createTable()
-      connected = true
-    } catch {
-      case e: java.io.IOException => log.warn(s"Failed to connect to cassandra, will retry in 5 sec")
-    }
-
-    Thread sleep 5000
-  }
-
-  def createTable(): Unit = CassandraConnector(conf) withSessionDo { session =>
-    val inputStream = getClass.getClassLoader getResourceAsStream CassandraCreationScriptPath
-    runScript(inputStream, session)
-  }
-
-
-  def runScript(inputStream: InputStream, session: Session) = {
-    val script = fromInputStream(inputStream)
-    try for { statementNoSemicolon <- script.mkString.split(";")
-              if !statementNoSemicolon.trim.isEmpty }
-      session.execute(s"${statementNoSemicolon};")
-    finally {
-      script.close()
-    }
-  }
 
   /**
    *
