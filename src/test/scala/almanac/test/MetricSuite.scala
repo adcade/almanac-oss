@@ -9,12 +9,8 @@ import org.scalatest.{FunSuite, Matchers}
 class MetricSuite extends FunSuite with Matchers {
 
   test("time span encode and decode") {
-    val code = DAY.index
-    code should be (5)
-    val span = TimeSpan(code)
-    span should be (DAY)
-    val span2 = TimeSpan("DAY")
-    span2 should be (DAY)
+    TimeSpan(DAY.index) should be (DAY)
+    TimeSpan("DAY") should be (DAY)
   }
 
   test("time span strip") {

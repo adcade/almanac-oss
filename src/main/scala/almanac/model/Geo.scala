@@ -8,6 +8,8 @@ object GeoHash {
   val LAT_RANGE = (-90.0, 90.0)
   val LNG_RANGE = (-180.0, 180.0)
 
+  def nullGeohash(precision: Int) = "------------".substring(0, precision)
+
   val GLOBAL = 0
   val MAX_PRECISION = 12
 
@@ -33,7 +35,8 @@ object GeoHash {
    * @return
    */
   def subGeohashes(geohash: String, precisions: Set[Int] = ALL_PRECISION): Seq[String] =
-    if (precisions contains geohash.length) Seq(geohash)
+    if (geohash.isNullGeohash) Nil // null geohash has no sub-geohashes
+    else if (precisions contains geohash.length) Seq(geohash)
     else if (geohash.length + 1 > precisions.max) Nil // no deeper search
     else BASE32 flatMap { char => subGeohashes(geohash + char, precisions) }
 
@@ -47,9 +50,20 @@ object GeoHash {
    * @return Optional superGeohash result
    */
   def superGeohash(geohash: String, precisions: Set[Int] = ALL_PRECISION): Option[String] =
-    if (precisions contains geohash.length) Some(geohash)
+    if (geohash.isNullGeohash) None // null geohash has no super-geohashes
+    else if (precisions contains geohash.length) Some(geohash)
     else if (geohash.isEmpty) None // you can't have super geohash of empty String
     else superGeohash(geohash.substring(0, geohash.length - 1), precisions)
+
+
+  private def charToInt(ch: Char) = BASE32.indexOf(ch)
+  private def intToBits(i: Int) = 4 to 0 by -1 map (i >> _ & 1) map (_==1)
+  private def split[T](l: List[T]) = (l :\ (List[T](), List[T]())) { case (b, (list1, list2)) => (b :: list2, list1) }
+  private def fromBits(bits: List[Boolean], bounds: Bounds): Bounds = (bounds /: bits ) {
+    case ((min, max), bool) =>
+      if (bool) ((min+max)/2, max)
+      else      (min, (min+max)/2)
+  }
 
   /**
    *
@@ -57,15 +71,7 @@ object GeoHash {
    * @return
    */
   def toBounds(geohash: String): (Bounds, Bounds) = {
-    def charToInt(ch: Char) = BASE32.indexOf(ch)
-    def intToBits(i: Int) = 4 to 0 by -1 map (i >> _ & 1) map (_==1)
-    def split[T](l: List[T]) = (l :\ (List[T](), List[T]())) { case (b, (list1, list2)) => (b :: list2, list1) }
-    def fromBits(bits: List[Boolean], bounds: Bounds): Bounds = (bounds /: bits ) {
-      case ((min, max), bool) =>
-        if (bool) ((min+max)/2, max)
-        else      (min, (min+max)/2)
-    }
-
+    require(geohash.nonNullGeohash, "null geohash has no location")
     val (lngBits, latBits) = split((geohash map charToInt flatMap intToBits).toList)
     (fromBits(latBits, LAT_RANGE), fromBits(lngBits, LNG_RANGE))
   }
@@ -119,6 +125,9 @@ object GeoHash {
 
   implicit class GeoHashHelper(geohash: String) {
 
+    def isNullGeohash: Boolean = geohash.startsWith(nullGeohash(1))
+    def nonNullGeohash: Boolean = !isNullGeohash
+
     /**
      *
      * @param precision
@@ -126,11 +135,16 @@ object GeoHash {
      */
     def roundOrPad(precision: Int): String = {
       require(precision >= 0)
-      val targetPrecision = math.min(precision, MAX_PRECISION)
-      val delta = targetPrecision - geohash.length
-      val sb = new StringBuilder(geohash)
-      if (delta <= 0) sb.substring(0, targetPrecision)
-      else ((sb append "s") /: (1 until delta)) { (sb, _) => sb append "0" }.toString
+      if (precision == 0) "" // TODO: even if no geohash provided, it has to happened somewhere in this world!?
+      else {
+        val targetPrecision = math.min(precision, MAX_PRECISION)
+        val delta = targetPrecision - geohash.length
+        val sb = new StringBuilder(geohash)
+
+        if (delta <= 0) sb.substring(0, targetPrecision)
+        else if (geohash.isNullGeohash) nullGeohash(targetPrecision)
+        else ((sb append "s") /: (1 until delta)) { (sb, _) => sb append "0" }.toString
+      }
     }
 
     /**
@@ -180,6 +194,7 @@ case class Coordinate(lat: Double, lng: Double) {
 
 object GeoRect {
   def apply(geohash: String): GeoRect = {
+    require(geohash.nonNullGeohash, "null geohash has no coresponding rectangle")
     val ((minLat, maxLat), (minLng, maxLng)) = toBounds(geohash)
     GeoRect(maxLat, maxLng, minLat, minLng)
   }

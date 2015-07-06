@@ -7,7 +7,7 @@ import kafka.utils.VerifiableProperties
 import org.scalatest.{FunSuite, Matchers}
 
 class SerializationSuite extends FunSuite with Matchers {
-  test("serializer test") {
+  test("kafka serializer test") {
     val metric = withFacts("class" -> "uberx") locate Coordinate("dr5ru7z77") increment "trip.update"
     val kser = new MetricKeySerializer(new VerifiableProperties())
     val vser = new MetricValueSerializer(new VerifiableProperties())

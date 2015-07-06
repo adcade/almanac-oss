@@ -9,7 +9,7 @@ import almanac.model.TimeSpan._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone.UTC
 
-case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, timestamp: Long, geohash: Option[String],
+case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, timestamp: Long, geohash: String,
                   count: Int, total: Long) {
   /**
    * The key part of the metrics
@@ -33,7 +33,7 @@ case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, ti
 object Metric {
   type FactMap = Map[String, String]
   case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
-                 geohash: Option[String]) {
+                 geohash: String) {
     /**
      *
      * @param toSpan
@@ -46,10 +46,9 @@ object Metric {
      * @param toGeoPrecision
      * @return
      */
-    def ~ (toGeoPrecision: Int) = Key(bucket, facts, span, timestamp, geohash match {
-      case Some(geohash) => Some(geohash ~ toGeoPrecision)
-      case _ => None
-    })
+    def ~ (toGeoPrecision: Int) = Key(bucket, facts, span, timestamp,
+      geohash ~ toGeoPrecision
+    )
 
     /**
      *
@@ -76,7 +75,8 @@ object Metric {
     def + (that: Value) = Value(count + that.count, total + that.total)
   }
 
-  private[model] case class RawBuilder private[model](facts: FactMap, geohash: Option[String] = None, optTime: Option[Long]=None) {
+  // FIXME: the null of geohash is driving me crazy! but Kryo in spark is having problem serializing Option[String]
+  private[model] case class RawBuilder private[model](facts: FactMap, geohash: String = nullGeohash(12), optTime: Option[Long]=None) {
     /**
      *
      * @param newFacts
@@ -96,7 +96,7 @@ object Metric {
      * @param coordinate
      * @return
      */
-    def locate(coordinate: Coordinate) = RawBuilder(facts, Some(coordinate.geohash), optTime)
+    def locate(coordinate: Coordinate) = RawBuilder(facts, coordinate.geohash, optTime)
 
     /**
      *
@@ -110,22 +110,14 @@ object Metric {
      * @param bucket
      * @return
      */
-    def increment(bucket: String) = count(bucket, 1)
+    def increment(bucket: String, amount: Int = 1) = gauge(bucket, 1)
 
     /**
      *
      * @param bucket
      * @return
      */
-    def decrement(bucket: String) = count(bucket, -1)
-
-    /**
-     *
-     * @param bucket
-     * @param amount
-     * @return
-     */
-    def count(bucket: String, amount: Int = 1) = gauge(bucket, amount)
+    def decrement(bucket: String, amount: Int = -1) = gauge(bucket, -1)
 
     /**
      *
@@ -157,7 +149,7 @@ object Metric {
    *
    * @return
    */
-  def locate(coordinate: Coordinate) = RawBuilder(Map(), Some(coordinate.geohash))
+  def locate(coordinate: Coordinate) = RawBuilder(Map(), coordinate.geohash)
 
   /**
    *

@@ -1,6 +1,5 @@
 package almanac.test
 
-import almanac.AlmanacSettings._
 import almanac.cassandra.CassandraMetricRDDRepository
 import almanac.cassandra.CassandraMetricRDDRepository.KeyIndex
 import almanac.model.Criteria._
@@ -12,12 +11,11 @@ import almanac.spark.AggregationSchedules
 import almanac.test.TestUtils.{avg, time}
 import almanac.util.MD5Helper._
 import com.datastax.spark.connector.cql.CassandraConnector
-import com.sun.java.swing.plaf.windows.resources.windows
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.joda.time.DateTime
-import org.scalatest.{ConfigMap, BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, ConfigMap, FunSuite, Matchers}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,10 +33,10 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with BeforeAndAfterAll 
   val facts2 = Map("device" -> "mobile", "os" -> "osx")
 
   val metrics = Seq(
-    Metric("std.impression", facts1, HOUR, timestamp, Some(geohash1), 62, 824),
-    Metric("std.impression", facts2, HOUR, timestamp, Some(geohash2), 62, 824),
-    Metric("std.exit", facts1, HOUR, timestamp, Some(geohash2), 62, 824),
-    Metric("std.exit", facts2, HOUR, timestamp, Some(geohash1), 62, 824)
+    Metric("std.impression", facts1, HOUR, timestamp, geohash1, 62, 824),
+    Metric("std.impression", facts2, HOUR, timestamp, geohash2, 62, 824),
+    Metric("std.exit", facts1, HOUR, timestamp, geohash2, 62, 824),
+    Metric("std.exit", facts2, HOUR, timestamp, geohash1, 62, 824)
   )
   // endregion
   var sc: SparkContext = null
@@ -81,10 +79,10 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with BeforeAndAfterAll 
     val result = repo readKeys (Set("std.impression", "std.exit"), GeoFilter(geohash1 ~ 3, 4), nofact) collect()
 
     result should contain theSameElementsAs Set(
-      KeyIndex("std.impression", Some(geohash1), hash(facts1), facts1),
-      KeyIndex("std.impression", Some(geohash2), hash(facts2), facts2),
-      KeyIndex("std.exit", Some(geohash2), hash(facts1), facts1),
-      KeyIndex("std.exit", Some(geohash1), hash(facts2), facts2)
+      KeyIndex("std.impression", geohash1, hash(facts1), facts1),
+      KeyIndex("std.impression", geohash2, hash(facts2), facts2),
+      KeyIndex("std.exit", geohash2, hash(facts1), facts1),
+      KeyIndex("std.exit", geohash1, hash(facts2), facts2)
     )
   }
 
@@ -126,8 +124,8 @@ class CassandraMetricRDDRepositorySuite extends FunSuite with BeforeAndAfterAll 
 
   test("test metrics query of no fact metrics") {
     val repo = new CassandraMetricRDDRepository(sc, schedules)
-    import almanac.spark.SparkMetricsAggregator._
     import almanac.spark.MetricsAggregator._
+    import almanac.spark.SparkMetricsAggregator._
     val nofactRdd = metricsRdd aggregateMetrics by(Nil)
     repo save nofactRdd
     repo saveKeys nofactRdd.map(_.key)

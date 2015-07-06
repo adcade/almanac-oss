@@ -28,8 +28,12 @@ class SparkAlmanacActor(repoFactory: AlmanacMetrcRDDRepositoryFactory,
   val sink = sinkFactory.createSink
 
   def receive: Receive = {
-    case Record(metrics) => sink.send(metrics)
+    case Record(metrics) => {
+      log.info(s"Almanac sending $metrics")
+      sink.send(metrics)
+    }
     case Query(query) =>
+      log.info(s"Almanac retrieving $query")
       val resultRDD = repo read query
       /*
       TODO: distinguish no group by or group by no fact

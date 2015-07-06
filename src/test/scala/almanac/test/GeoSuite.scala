@@ -78,6 +78,11 @@ class GeoSuite extends FunSuite with Matchers {
     assert(!(-45.0 northOf  45.0))
   }
 
+  test("null geohash") {
+    an[IllegalArgumentException] should be thrownBy GeoRect(nullGeohash(1))
+    an[IllegalArgumentException] should be thrownBy Coordinate(nullGeohash(1))
+  }
+
   test("rect intersect rect") {
     assert (   GeoRect(90.0,180.0,-90.0,-180.0) intersects GeoRect("g")                    )
     assert (   GeoRect(90.0,180.0,-90.0,-180.0) intersects GeoRect(10, 10, -10, -10)       )

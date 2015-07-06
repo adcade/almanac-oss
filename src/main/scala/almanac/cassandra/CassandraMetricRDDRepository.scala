@@ -13,8 +13,7 @@ import com.datastax.driver.core.Session
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.datastax.spark.connector.types._
-import org.apache.spark.{metrics, SparkContext}
-import org.apache.spark.metrics.source
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
 
@@ -71,7 +70,7 @@ object CassandraMetricRDDRepository {
     COLUMN_NAMES.TOTAL
   )
 
-  case class KeyIndex(bucket: String, geohash: Option[String], factkey: String, facts: Map[String, String])
+  case class KeyIndex(bucket: String, geohash: String, factkey: String, facts: Map[String, String])
 }
 
 object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFactory {
@@ -197,7 +196,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
     val partitionKeys = for {
       bucket <- query.buckets
       geohash <- getGeoHashes(query.geoFilter)
-    } yield KeyIndex(bucket, Some(geohash), FACTKEY_OF_EMPTY, Map())
+    } yield KeyIndex(bucket, geohash, FACTKEY_OF_EMPTY, Map())
 
     val keyIndice = sc.parallelize(partitionKeys.toSeq).repartitionByCassandraReplica(KEYSPACE, METRICS_TABLE)
 

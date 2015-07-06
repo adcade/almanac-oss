@@ -35,10 +35,11 @@ object GeoFilter {
  * @param rect
  * @param maxPrecision
  */
+// TODO geofilter for null geohash
 case class GeoFilter(rect: GeoRect, maxPrecision: Int) {
   override def toString: String =
     if (this == GlobalFilter) "GLOBAL"
-    else "rect %s max %s" format (rect, maxPrecision)
+    else "%s max %s" format (rect, maxPrecision)
 }
 
 object Order extends Enumeration {
