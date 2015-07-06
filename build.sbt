@@ -26,7 +26,7 @@ libraryDependencies ++= {
     "org.apache.spark"   %% "spark-streaming"           % sparkVersion,
     "org.apache.spark"   %% "spark-streaming-kafka"     % sparkVersion,
     "com.datastax.spark" %% "spark-cassandra-connector" % "1.4.0-M1",
-    "com.twitter"        %% "chill"                     % "0.6.0",
+    "com.twitter"        %% "chill"                     % "0.5.0",
 
     "io.spray"           %% "spray-testkit"             % sprayVersion % Test,
     "com.typesafe.akka"  %% "akka-testkit"              % akkaVersion  % Test,

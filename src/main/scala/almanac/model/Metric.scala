@@ -110,14 +110,14 @@ object Metric {
      * @param bucket
      * @return
      */
-    def increment(bucket: String, amount: Int = 1) = gauge(bucket, 1)
+    def increment(bucket: String, amount: Int = 1) = gauge(bucket, amount)
 
     /**
      *
      * @param bucket
      * @return
      */
-    def decrement(bucket: String, amount: Int = -1) = gauge(bucket, -1)
+    def decrement(bucket: String, amount: Int = -1) = gauge(bucket, -amount)
 
     /**
      *
