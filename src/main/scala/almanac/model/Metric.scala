@@ -9,7 +9,7 @@ import almanac.model.TimeSpan._
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone.UTC
 
-case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, timestamp: Long, geohash: String,
+case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, timestamp: Long, geohash: Option[String],
                   count: Int, total: Long) {
   /**
    * The key part of the metrics
@@ -33,7 +33,7 @@ case class Metric(bucket: String, facts: Map[String, String], span: TimeSpan, ti
 object Metric {
   type FactMap = Map[String, String]
   case class Key(bucket: String, facts: FactMap, span: TimeSpan, timestamp: Long,
-                 geohash: String) {
+                 geohash: Option[String]) {
     /**
      *
      * @param toSpan
@@ -46,7 +46,10 @@ object Metric {
      * @param toGeoPrecision
      * @return
      */
-    def ~ (toGeoPrecision: Int) = Key(bucket, facts, span, timestamp, geohash ~ toGeoPrecision)
+    def ~ (toGeoPrecision: Int) = Key(bucket, facts, span, timestamp, geohash match {
+      case Some(geohash) => Some(geohash ~ toGeoPrecision)
+      case _ => None
+    })
 
     /**
      *
@@ -73,7 +76,7 @@ object Metric {
     def + (that: Value) = Value(count + that.count, total + that.total)
   }
 
-  private[model] case class RawBuilder private[model](facts: FactMap, geohash: String = "", optTime: Option[Long]=None) {
+  private[model] case class RawBuilder private[model](facts: FactMap, geohash: Option[String] = None, optTime: Option[Long]=None) {
     /**
      *
      * @param newFacts
@@ -93,7 +96,7 @@ object Metric {
      * @param coordinate
      * @return
      */
-    def locate(coordinate: Coordinate) = RawBuilder(facts, coordinate.geohash, optTime)
+    def locate(coordinate: Coordinate) = RawBuilder(facts, Some(coordinate.geohash), optTime)
 
     /**
      *
@@ -154,7 +157,7 @@ object Metric {
    *
    * @return
    */
-  def locate(coordinate: Coordinate) = RawBuilder(Map(), coordinate.geohash)
+  def locate(coordinate: Coordinate) = RawBuilder(Map(), Some(coordinate.geohash))
 
   /**
    *

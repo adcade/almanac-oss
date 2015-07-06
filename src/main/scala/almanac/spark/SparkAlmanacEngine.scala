@@ -17,8 +17,9 @@ class SparkAlmanacEngine(repoFactory: AlmanacMetrcRDDRepositoryFactory,
   implicit val repo = repoFactory.createRepository(schedules)(ssc.sparkContext)
   streamFactory.createSource.stream(ssc) aggregateWithSchedule schedules stats Seconds(10)
 
-  private def createStreamingContext(): StreamingContext =
-    new StreamingContext(AlmanacSparkConf, Milliseconds(SparkStreamingBatchDuration))
+  private def createStreamingContext(): StreamingContext = {
+    new StreamingContext(AlmanacGlobalSparkContext, Milliseconds(SparkStreamingBatchDuration))
+  }
 
   override def run() = {
     ssc.start()

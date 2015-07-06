@@ -5,7 +5,7 @@ import java.util.Properties
 import akka.japi.Util.immutableSeq
 import almanac.model.TimeSpan
 import com.typesafe.config.ConfigFactory
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkContext, SparkConf}
 
 /* Initializes Akka, Spark, Cassandra and Kafka settings. */
 object AlmanacSettings {
@@ -39,6 +39,8 @@ object AlmanacSettings {
     .set("spark.cassandra.connection.host", config.getString("cassandra.connection.host"))
     .set("spark.cleaner.ttl", config.getInt("spark.cleaner.ttl").toString)
     .set("spark.ui.enabled", config.getBoolean("spark.ui.enabled").toString)
+
+  val AlmanacGlobalSparkContext = SparkContext getOrCreate AlmanacSparkConf
 
   val KafkaConsumerParam = Map[String, String](
     "metadata.broker.list" -> kafkaConfig.getString("metadata.broker.list")

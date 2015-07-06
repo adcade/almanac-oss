@@ -22,7 +22,8 @@ class SparkAlmanacActor(repoFactory: AlmanacMetrcRDDRepositoryFactory,
                         sinkFactory: MetricSinkFactory) extends Actor with Logging {
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
 
-  implicit val sc = SparkContext getOrCreate AlmanacSparkConf
+  // FIXME: global SparkContext
+  implicit val sc = AlmanacGlobalSparkContext
   implicit val repo = repoFactory.createRepository(schedules)
   val sink = sinkFactory.createSink
 
