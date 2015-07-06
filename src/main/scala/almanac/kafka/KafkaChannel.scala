@@ -18,19 +18,13 @@ import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.kafka.KafkaUtils._
 
-class MetricKeyEncoder(verifiableProperties: VerifiableProperties) extends Encoder[Key] {
+class MetricKeySerializer(veriProps: VerifiableProperties) extends Encoder[Key] with Decoder[Key] {
   override def toBytes(t: Key): Array[Byte] = defaultPool.toBytesWithClass(t)
-}
-
-class MetricValueEncoder(verifiableProperties: VerifiableProperties) extends Encoder[Value] {
-  override def toBytes(t: Value): Array[Byte] = defaultPool.toBytesWithClass(t)
-}
-
-class MetricKeyDecoder(verifiableProperties: VerifiableProperties) extends Decoder[Key] {
   override def fromBytes(bytes: Array[Byte]): Key = defaultPool.fromBytes(bytes).asInstanceOf[Key]
 }
 
-class MetricValueDecoder(verifiableProperties: VerifiableProperties) extends Decoder[Value] {
+class MetricValueSerializer(veriProps: VerifiableProperties) extends Encoder[Value] with Decoder[Value] {
+  override def toBytes(t: Value): Array[Byte] = defaultPool.toBytesWithClass(t)
   override def fromBytes(bytes: Array[Byte]): Value = defaultPool.fromBytes(bytes).asInstanceOf[Value]
 }
 
@@ -50,7 +44,7 @@ class KafkaChannel extends MetricSink with DStreamSource[Metric] {
 
   def stream(ssc: StreamingContext): DStream[Metric] = {
     // TODO: check offset?
-    createDirectStream [Key, Value, MetricKeyDecoder, MetricValueDecoder] (ssc,
+    createDirectStream [Key, Value, MetricKeySerializer, MetricValueSerializer] (ssc,
       kafkaParams = KafkaConsumerParam,
       topics = Set(KafkaMetricTopic)) map { case (k,v) => Metric(k, v) }
   }

@@ -17,7 +17,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object AlmanacDemo extends App{
 
-  val system = ActorSystem("almanac")
+  val system = ActorSystem("demo")
 
   val clientActor = system.actorOf(SparkAlmanacActor.props, "clientActor")
 

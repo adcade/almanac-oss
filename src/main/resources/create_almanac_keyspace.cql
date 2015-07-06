@@ -22,3 +22,5 @@ CREATE TABLE IF NOT EXISTS facts (
     facts map<text, text>,
     PRIMARY KEY ((bucket, geohash), factkey)
 );
+
+CREATE INDEX IF NOT EXISTS ON facts (keys(facts));

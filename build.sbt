@@ -33,7 +33,6 @@ libraryDependencies ++= {
     "org.specs2"         %% "specs2-core"               % "2.4.15"     % Test,
     "org.scalatest"      %% "scalatest"                 % "2.2.4"      % Test,
     "org.scalamock"      %% "scalamock-specs2-support"  % "3.2.1"      % Test exclude("org.specs2", "specs2")
-
   )
 }
 
