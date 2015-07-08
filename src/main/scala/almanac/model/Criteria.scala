@@ -21,9 +21,7 @@ object Criteria {
   def nofact = NonFactCriteria
 }
 
-object NonCriteria extends Criteria
-
-object NonFactCriteria extends Criteria
+// region fact criteria
 
 sealed trait FactCriteria[R] extends Criteria {
   val reference: R
@@ -36,6 +34,10 @@ case class NotIn(fact: String, reference: Set[String]) extends FactCriteria[Set[
 case class Is   (fact: String, reference: String     ) extends FactCriteria[String]
 case class IsNot(fact: String, reference: String     ) extends FactCriteria[String]
 case class Like (fact: String, reference: String     ) extends FactCriteria[String]
+
+// endregion
+
+// region collective criteria
 
 sealed trait CollectiveCriteria extends Iterable[Criteria] with Criteria {
   protected val criteria: Set[Criteria]
@@ -84,3 +86,9 @@ case class Or private[model] (criteria: Set[Criteria] = Set()) extends Collectiv
     case otherCriterion => Or(this.criteria + otherCriterion)
   }
 }
+
+// endregion
+
+object NonCriteria extends Criteria
+
+object NonFactCriteria extends Criteria

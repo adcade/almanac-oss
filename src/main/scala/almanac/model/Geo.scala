@@ -408,4 +408,22 @@ case class GeoRect(north: Double, east: Double, south: Double, west: Double) ext
    * @return
    */
   def contains(geohash: String): Boolean = contains(GeoRect(geohash))
+
+
+  val lnOf2 = math.log(2)
+  /**
+   * log2 of a product of numbers, based on a series of theorems:
+   *
+   * log2(x) = log(x) / log(2)
+   *
+   * log2(a * b) = log2(a) + log2(b)
+   *
+   * @param num
+   * @return
+   */
+  private def log2(num: Double*) = (num map math.log).sum / lnOf2
+
+  private def precision = log2(360 / (right-left), 180 / (top-bottom)) / 5
+
+  def defaultGeohashes = geohashes(Set(math.ceil(precision).toInt + 1))
 }

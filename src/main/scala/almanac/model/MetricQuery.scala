@@ -81,7 +81,9 @@ case class MetricsQuery (
    * @return
    */
   // TODO: need to work on geoFilter
-  def unwoundQueries = buckets map (b => MetricsQuery(Set(b), criteria, groupNames, orders, geoFilter, timeFilter))
+  def unwoundQueries = for {
+    b <- buckets
+  } yield MetricsQuery(Set(b), criteria, groupNames, orders, geoFilter, timeFilter)
 
   override def toString: String = {
     val sb = new StringBuilder
