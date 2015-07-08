@@ -7,20 +7,16 @@ import almanac.AlmanacSettings.CassandraCreationScriptPath
 import almanac.model.GeoFilter.GlobalFilter
 import almanac.model.TimeFilter.EverFilter
 import almanac.model._
-import almanac.spark.{AggregationSchedules, AlmanacMetrcRDDRepositoryFactory, MetricRDDRepository}
+import almanac.spark.{AggregationSchedules, MetrcRDDRepositoryFactory => AlmanacMetrcRDDRepositoryFactory, MetricRDDRepository}
 import almanac.util.MD5Helper._
-import almanac.util.RetryHelper._
 import com.datastax.driver.core.Session
 import com.datastax.spark.connector._
 import com.datastax.spark.connector.cql.CassandraConnector
 import com.datastax.spark.connector.types._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.{SparkConf, Logging, SparkContext}
+import org.apache.spark.{Logging, SparkConf, SparkContext}
 
-import scala.concurrent.{Future, Await}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.io.Source._
 import scala.reflect.runtime.universe._
 
@@ -87,12 +83,9 @@ object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFact
 
   def runScript(inputStream: InputStream, session: Session) = {
     val script = fromInputStream(inputStream)
-    try for { statementNoSemicolon <- script.mkString.split(";")
-              if !statementNoSemicolon.trim.isEmpty }
-      session.execute(s"${statementNoSemicolon};")
-    finally {
-      script.close()
-    }
+    try
+      script.mkString split "(?<=;)" map (_.trim) filter (_.nonEmpty) foreach session.execute
+    finally script.close()
   }
 
 
@@ -288,7 +281,7 @@ class CassandraMetricRDDRepository(sc: SparkContext, schedules: AggregationSched
 
   private def getGeoHashes(geoFilter: GeoFilter): Set[String] = {
     val precisions = schedules.geoPrecisions.takeWhile(_ <= geoFilter.maxPrecision).toSet
-    geoFilter.rect.geohashes(precisions)
+    geoFilter.shape.geohashes(precisions)
   }
 
   override def close() = sc.stop()

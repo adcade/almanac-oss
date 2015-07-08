@@ -230,7 +230,7 @@ object GeoRect {
     if (co1.lng westOf  co1.lng) co1.lng else co2.lng)
 }
 
-trait Shape {
+trait GeoShape {
   def intersects(other: GeoRect): Boolean
   def intersects(geohash: String): Boolean
   def contains(co: Coordinate): Boolean
@@ -274,7 +274,7 @@ trait Shape {
   }
 }
 
-case class GeoRect(north: Double, east: Double, south: Double, west: Double) extends Shape {
+case class GeoRect(north: Double, east: Double, south: Double, west: Double) extends GeoShape {
   require((north in LAT_RANGE) && (south in LAT_RANGE), "latitude out of bound [-90, 90]")
   require((east in LNG_RANGE) && (west in LNG_RANGE), "longitude out of bound [-180, 180]")
   require(north >= south, "latitude north < south.")

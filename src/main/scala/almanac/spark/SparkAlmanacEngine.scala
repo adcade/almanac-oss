@@ -4,11 +4,9 @@ import almanac.AlmanacSettings._
 import almanac.model.Metric
 import almanac.spark.SparkMetricsAggregator._
 import org.apache.spark.SparkContext
-import org.apache.spark.metrics.source
-import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
 
-class SparkAlmanacEngine(repoFactory: AlmanacMetrcRDDRepositoryFactory,
+class SparkAlmanacEngine(repoFactory: MetrcRDDRepositoryFactory,
                          streamFactory: DStreamSourceFactory[Metric],
                          sparkContext: SparkContext) extends Runnable {
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)

@@ -16,6 +16,7 @@ object TestModels extends App {
         and (fact("os") like """*ios*""") )
     .groupBy("adId", "site")
     .orderBy("adId", Order.ASC)
+    .locate(shape = GeoRect("dr5ru"))
     .time(DAY, 1420020000000L, 1420106400000L)
     .limit(1000)
     .skip(2000)

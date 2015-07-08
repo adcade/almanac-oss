@@ -32,14 +32,14 @@ object GeoFilter {
 
 /**
  *
- * @param rect
+ * @param shape
  * @param maxPrecision
  */
 // TODO geofilter for null geohash
-case class GeoFilter(rect: GeoRect, maxPrecision: Int) {
+case class GeoFilter(shape: GeoShape, maxPrecision: Int) {
   override def toString: String =
     if (this == GlobalFilter) "GLOBAL"
-    else "%s max %s" format (rect, maxPrecision)
+    else "%s max %s" format (shape, maxPrecision)
 }
 
 object Order extends Enumeration {
@@ -172,11 +172,11 @@ object MetricsQuery {
 
     /**
      *
-     * @param rect
+     * @param shape
      * @param maxPrecision
      * @return
      */
-    def locate(rect: GeoRect, maxPrecision: Int = MAX_PRECISION): Builder = locate(GeoFilter(rect, maxPrecision))
+    def locate(shape: GeoShape, maxPrecision: Int = MAX_PRECISION): Builder = locate(GeoFilter(shape, maxPrecision))
 
     /**
      *

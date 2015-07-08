@@ -2,8 +2,6 @@ package almanac.test
 
 import java.lang.System._
 
-import scalaz.syntax.std.all
-
 object TestUtils {
 
   def time[long](block: => Unit): Long = {

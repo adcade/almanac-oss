@@ -7,7 +7,6 @@ import almanac.api.{MetricSink, MetricSinkFactory}
 import almanac.model.Metric
 import almanac.model.Metric.{Key, Value}
 import almanac.spark.{DStreamSource, DStreamSourceFactory}
-import almanac.util.RetryHelper.retry
 import com.twitter.chill.ScalaKryoInstantiator.defaultPool
 import kafka.admin.AdminUtils._
 import kafka.producer.{KeyedMessage, Producer, ProducerConfig}
@@ -19,10 +18,6 @@ import org.apache.spark.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.kafka.KafkaUtils._
-
-import scala.concurrent.{Future, Await}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 class MetricKeySerializer(veriProps: VerifiableProperties) extends Encoder[Key] with Decoder[Key] {
   override def toBytes(t: Key): Array[Byte] = defaultPool.toBytesWithClass(t)

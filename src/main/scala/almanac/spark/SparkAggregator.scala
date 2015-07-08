@@ -55,9 +55,16 @@ object SparkMetricsAggregator {
      *
      * Seq(HOUR, DAY, EVER) Seq(8, 4, GLOBAL)
      *
-     * 12, RAW -> 8, HOUR -> 8, DAY -> 8, EVER -> 4, EVER -> GLOBAL, EVER
+     * (12, RAW) -> (12, HOUR) -> (8, HOUR) -> 8, DAY) -> 8, EVER) -> 8, EVER) -> 8, EVER)
+     *                               |
+     *                               v
+     *                            (4, HOUR) -> 4, DAY) -> 4, EVER) -> 4, EVER) -> 4, EVER)
+     *                               |
+     *                               v
+     *                   GLOBAL / (0, HOUR) -> 0, DAY) -> 0, EVER) -> 0, EVER) -> 0, EVER)
      *
      * the return value is the last aggregated stream in the above case: GLOBAL / EVER
+     *
      * @param repo the stream to be aggregated
      * @param schedules
      * @return the stream of the last aggregated stream

@@ -51,7 +51,7 @@ trait MetricRDDRepository extends AutoCloseable{
   def readFacts(buckets: Set[String], geoFilter: GeoFilter = GlobalFilter, criteria: Criteria): RDD[Map[String, String]]
 }
 
-trait AlmanacMetrcRDDRepositoryFactory {
+trait MetrcRDDRepositoryFactory {
   def createRepository(schedules: AggregationSchedules)(implicit sc: SparkContext): MetricRDDRepository
 }
 
