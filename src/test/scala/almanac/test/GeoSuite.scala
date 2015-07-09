@@ -97,15 +97,15 @@ class GeoSuite extends FunSuite with Matchers {
   }
 
   test ("super-geohash and sub-geohashes") {
-    superGeohash("gehs") should be (Some("gehs"))
-    superGeohash("gehs", Set(7, 5, 2, 0)) should be (Some("ge"))
-    superGeohash("g", Set(7, 5, 2)) should be (None)
-    superGeohash("g", Set(7, 5, 2, 0)) should be (Some(""))
+    "gehs".superGeohash() should be (Some("gehs"))
+    "gehs".superGeohash(Set(7, 5, 2, 0)) should be (Some("ge"))
+    "g".superGeohash(Set(7, 5, 2)) should be (None)
+    "g".superGeohash(Set(7, 5, 2, 0)) should be (Some(""))
 
-    subGeohashes("gehs") should be (Seq("gehs"))
-    subGeohashes("gehs", Set(7, 5, 2, 0)).toSet should be ((for (i <- BASE32) yield s"gehs$i").toSet)
-    subGeohashes("gehs", Set(2, 0)) should be (Nil)
-    subGeohashes("", Set(2)).toSet should be ((for (i <- BASE32; j <- BASE32) yield s"$i$j").toSet)
+    "gehs".subGeohashes() should be (Seq("gehs"))
+    "gehs".subGeohashes(Set(7, 5, 2, 0)).toSet should be ((for (i <- BASE32) yield s"gehs$i").toSet)
+    "gehs".subGeohashes(Set(2, 0)) should be (Nil)
+    "".subGeohashes(Set(2)).toSet should be ((for (i <- BASE32; j <- BASE32) yield s"$i$j").toSet)
   }
   test ("rectangle geohashes test") {
     GeoRect("c4").geohashes(Set.empty[Int]) should be (Set())
