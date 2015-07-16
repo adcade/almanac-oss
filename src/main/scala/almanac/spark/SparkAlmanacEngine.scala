@@ -1,14 +1,14 @@
 package almanac.spark
 
-import almanac.AlmanacSettings._
+import almanac.AlmanacSettings
 import almanac.model.Metric
 import almanac.spark.SparkMetricsAggregator._
 import org.apache.spark.SparkContext
 import org.apache.spark.streaming.{Milliseconds, Seconds, StreamingContext}
 
-class SparkAlmanacEngine(repoFactory: MetrcRDDRepositoryFactory,
+class SparkAlmanacEngine(repoFactory: MetricRDDRepositoryFactory,
                          streamFactory: DStreamSourceFactory[Metric],
-                         sparkContext: SparkContext) extends Runnable {
+                         sparkContext: SparkContext) extends Runnable with AlmanacSettings {
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
 
   // FIXME: checkpointPath

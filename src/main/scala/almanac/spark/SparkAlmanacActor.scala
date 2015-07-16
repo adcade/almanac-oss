@@ -1,7 +1,7 @@
 package almanac.spark
 
 import akka.actor._
-import almanac.AlmanacSettings._
+import almanac.AlmanacSettings
 import almanac.api.AlmanacProtocol.{Query, QueryResult, Record}
 import almanac.api.MetricSinkFactory
 import almanac.cassandra.CassandraMetricRDDRepositoryFactory
@@ -16,9 +16,9 @@ object SparkAlmanacActor {
   }
 }
 
-class SparkAlmanacActor(val repoFactory: MetrcRDDRepositoryFactory,
+class SparkAlmanacActor(val repoFactory: MetricRDDRepositoryFactory,
                         val sinkFactory: MetricSinkFactory,
-                        implicit val sparkContext: SparkContext) extends Actor with Logging {
+                        implicit val sparkContext: SparkContext) extends Actor with Logging with AlmanacSettings {
   val schedules = AggregationSchedules(GeoSchedules, TimeSchedules)
 
   // FIXME: global SparkContext

@@ -2,7 +2,7 @@ package almanac.kafka
 
 import java.util.Properties
 
-import almanac.AlmanacSettings._
+import almanac.AlmanacSettings
 import almanac.api.{MetricSink, MetricSinkFactory}
 import almanac.model.Metric
 import almanac.model.Metric.{Key, Value}
@@ -29,7 +29,7 @@ class MetricValueSerializer(veriProps: VerifiableProperties) extends Encoder[Val
   override def fromBytes(bytes: Array[Byte]): Value = defaultPool.fromBytes(bytes).asInstanceOf[Value]
 }
 
-class KafkaChannel extends MetricSink with DStreamSource[Metric] with Logging {
+class KafkaChannel extends MetricSink with DStreamSource[Metric] with Logging with AlmanacSettings {
   private lazy val producer = new Producer[Key, Value](new ProducerConfig(KafkaProducerProperties))
 
   def stream(ssc: StreamingContext): DStream[Metric] = {
@@ -65,7 +65,7 @@ object KafkaChannelFactory extends MetricSinkFactory with DStreamSourceFactory[M
   }
 }
 
-object ZookeeperUtils {
+object ZookeeperUtils extends AlmanacSettings {
   def createClient(config: Properties = KafkaProducerProperties,
                    sessTimeout: Int = 10000,
                    connTimeout: Int = 10000,

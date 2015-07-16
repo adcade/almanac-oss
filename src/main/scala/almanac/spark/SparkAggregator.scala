@@ -86,6 +86,7 @@ object SparkMetricsAggregator {
         nextStream
       }
     }
+
   }
 
   val defaultSchedules = AggregationSchedules(List(GeoHash.GLOBAL), List(TimeSpan.EVER))

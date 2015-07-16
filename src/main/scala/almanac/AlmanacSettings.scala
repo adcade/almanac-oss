@@ -7,8 +7,10 @@ import almanac.model.{Metric, TimeSpan}
 import com.typesafe.config.ConfigFactory
 import org.apache.spark.{SparkContext, SparkConf}
 
-/* Initializes Akka, Spark, Cassandra and Kafka settings. */
-object AlmanacSettings {
+/**
+ *  Initializes Akka, Spark, Cassandra and Kafka settings
+ */
+trait AlmanacSettings {
   val rootConfig = ConfigFactory.load
 
   protected val config = rootConfig.getConfig("almanac")

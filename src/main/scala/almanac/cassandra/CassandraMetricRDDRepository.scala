@@ -3,11 +3,10 @@ package almanac.cassandra
 import java.io.InputStream
 
 import almanac.AlmanacSettings
-import almanac.AlmanacSettings.CassandraCreationScriptPath
 import almanac.model.GeoFilter.GlobalFilter
 import almanac.model.TimeFilter.EverFilter
 import almanac.model._
-import almanac.spark.{AggregationSchedules, MetrcRDDRepositoryFactory => AlmanacMetrcRDDRepositoryFactory, MetricRDDRepository}
+import almanac.spark.{AggregationSchedules, MetricRDDRepositoryFactory => AlmanacMetrcRDDRepositoryFactory, MetricRDDRepository}
 import almanac.util.MD5Helper._
 import com.datastax.driver.core.Session
 import com.datastax.spark.connector._
@@ -21,7 +20,7 @@ import scala.io.Source._
 import scala.reflect.runtime.universe._
 
 
-object CassandraMetricRDDRepository {
+object CassandraMetricRDDRepository extends AlmanacSettings {
   object IntToTimeSpanConverter extends TypeConverter[TimeSpan] {
     def targetTypeTag = typeTag[TimeSpan]
     def convertPF = { case code: Int => TimeSpan(code) }
@@ -32,9 +31,9 @@ object CassandraMetricRDDRepository {
     def convertPF = { case span: TimeSpan => span.index }
   }
 
-  private[almanac] val KEYSPACE = AlmanacSettings.CassandraKeyspace
-  private[almanac] val METRICS_TABLE = AlmanacSettings.CassandraMetricsTable
-  private[almanac] val FACTS_TABLE = AlmanacSettings.CassandraFactsTable
+  private[almanac] val KEYSPACE = CassandraKeyspace
+  private[almanac] val METRICS_TABLE = CassandraMetricsTable
+  private[almanac] val FACTS_TABLE = CassandraFactsTable
 
   private val FACTKEY_OF_EMPTY = "d41d8cd98f00b204e9800998ecf8427e"
 
@@ -74,7 +73,7 @@ object CassandraMetricRDDRepository {
   case class KeyIndex(bucket: String, geohash: String, factkey: String, facts: Map[String, String])
 }
 
-object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFactory {
+object CassandraMetricRDDRepositoryFactory extends AlmanacMetrcRDDRepositoryFactory with AlmanacSettings {
 
   def createTable(conf: SparkConf): Unit = CassandraConnector(conf) withSessionDo { session =>
     val inputStream = getClass.getClassLoader getResourceAsStream CassandraCreationScriptPath

@@ -1,7 +1,6 @@
 package almanac
 
 import akka.actor.ActorSystem
-import almanac.AlmanacSettings._
 import almanac.api.ActorAlmanacClient
 import almanac.cassandra.CassandraMetricRDDRepositoryFactory
 import almanac.kafka.KafkaChannelFactory
@@ -15,7 +14,7 @@ import org.joda.time.DateTime
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object AlmanacDemo extends App{
+object AlmanacDemo extends App with AlmanacSettings {
 
   val system = ActorSystem("demo")
 
